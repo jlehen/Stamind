@@ -21,6 +21,9 @@
   --start: #2f7bd6;
   --done: #1f9d55;
   --danger: #c23b3b;
+  /* A warm-up row's amber, its text dark on a light theme and light on a dark one. */
+  --warm: #d98a1c;
+  --warm-text: color-mix(in srgb, var(--warm) 55%, var(--text));
 
   --tap: 44px;
   --radius: 12px;
@@ -248,35 +251,11 @@ h1 {
   font-weight: 400;
 }
 
-.card-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
+/* Every written line of the card, which may wrap (§1). */
 .card-pres {
+  margin-top: 4px;
   font-size: 13px;
   color: var(--hint);
-}
-
-/* "Warm-up" or "Main": a tag the athlete taps to switch (§1). */
-.kind {
-  flex: none;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 15px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.kind.warmup {
-  border-color: #d98a1c;
-  background: #d98a1c;
-  color: #ffffff;
 }
 
 .photos {
@@ -314,16 +293,10 @@ h1 {
 
 .set {
   display: grid;
-  grid-template-columns: 16px 1fr 1fr var(--tap);
+  grid-template-columns: 30px 1fr 1fr var(--tap);
   align-items: center;
   gap: 6px;
   margin-top: 8px;
-}
-
-.set-index {
-  font-size: 12px;
-  color: var(--hint);
-  text-align: center;
 }
 
 .stepper {
@@ -349,6 +322,13 @@ h1 {
 
 .step:active {
   background: var(--line);
+}
+
+/* On a 360px phone the set's mark leaves the numbers too little room for "137.5". */
+@media (max-width: 374px) {
+  .step {
+    width: 32px;
+  }
 }
 
 .num-box {
@@ -414,6 +394,35 @@ h1 {
   font-weight: 650;
 }
 
+/* A set's mark: its number, or "W" on a warm-up row, whose steppers take an amber tint; a tap
+   switches the row (§1). The amber mixes with the page's own background, light or dark. */
+.mark {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hint);
+  font-size: 12px;
+}
+
+.mark.warmup {
+  border-color: var(--warm);
+  background: color-mix(in srgb, var(--warm) 22%, var(--bg));
+  color: var(--warm-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.set.warmup .stepper {
+  background: color-mix(in srgb, var(--warm) 12%, var(--bg));
+}
+
+.set.warmup:not(.done) .stepper {
+  border-color: color-mix(in srgb, var(--warm) 70%, var(--bg));
+}
+
 /* ----- the buttons under an exercise, two rows of four on a phone ----- */
 
 .tools {
@@ -426,7 +435,7 @@ h1 {
 .pill {
   min-width: 0;
   min-height: var(--tap);
-  padding: 0 6px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--bg);
@@ -436,6 +445,59 @@ h1 {
 
 .pill.danger {
   color: var(--danger);
+}
+
+/* A split pill: one cell whose left half takes a row away and right half adds one, the word
+   over both letting taps through (§1). The warm-up one takes the warm-up row's amber. */
+.split {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: var(--tap);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.half {
+  flex: 1;
+  min-width: 0;
+  padding: 0 3px;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+}
+
+.half.less {
+  text-align: left;
+}
+
+.half.more {
+  text-align: right;
+}
+
+.half:active {
+  background: var(--line);
+}
+
+.split-word {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.split.warmup {
+  border-color: var(--warm);
+}
+
+.split.warmup .split-word {
+  color: var(--warm-text);
 }
 
 /* The card's undo is the bare ↶, drawn large enough to find (§1). */
@@ -612,7 +674,7 @@ h1 {
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 30px;
+  min-height: 36px;
   padding: 0 8px;
   border: 0;
   border-bottom: 1px solid var(--line);
@@ -631,19 +693,6 @@ h1 {
   background: color-mix(in srgb, var(--done) 22%, transparent);
 }
 
-.order-kind {
-  flex: none;
-  width: 62px;
-  font-size: 12px;
-  white-space: nowrap;
-  color: var(--hint);
-}
-
-.order-kind.warmup {
-  color: #d98a1c;
-  font-weight: 600;
-}
-
 .order-name {
   flex: 1;
   min-width: 0;
@@ -659,7 +708,7 @@ h1 {
   color: var(--hint);
 }
 
-.order-row.picked .order-kind, .order-row.picked .order-load {
+.order-row.picked .order-load {
   color: inherit;
 }
 

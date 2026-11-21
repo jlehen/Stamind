@@ -105,6 +105,8 @@ test("the Order sheet makes two tapped exercises trade places", async (t) => {
     assert.equal(await page.evaluate(() => window.__mainButton), false);
     const rows = page.locator("#order-rows .order-row");
     assert.equal(await rows.count(), before.length);
+    // The belt squat's line shows its heaviest load, not its warm-up's.
+    assert.equal(await rows.nth(0).locator(".order-load").textContent(), "140 kg");
 
     // A tap on the picked line lets it go; two different lines trade places.
     await rows.nth(0).click();
@@ -122,6 +124,59 @@ test("the Order sheet makes two tapped exercises trade places", async (t) => {
     assert.equal(await page.evaluate(() => window.__mainButton), true);
     await page.locator("#undo").click();
     assert.deepEqual(await names(), before);
+  });
+});
+
+// The demo session writes the belt squat as 1×5 @ 120, then 3×4–6 @ 140: one card (§1).
+test("a warm-up and its main sets are one card, each row's mark a warm-up switch", async (t) => {
+  await onPhone(t, async (page, site) => {
+    await page.goto(`${site}/`, { waitUntil: "networkidle" });
+    await page.waitForSelector(".card");
+    const card = page.locator(".card").first();
+    const marks = () => card.locator(".mark").allTextContents();
+    assert.equal(await card.locator(".card-pres").textContent(), "1×5 @ 120 kg, 3×4–6 @ 140 kg");
+    assert.deepEqual(await marks(), ["W", "1", "2", "3"]);
+
+    // A warm-up row goes under the warm-up; a tap on a main row's mark makes it a warm-up.
+    await card.getByRole("button", { name: "Add a warm-up set" }).click();
+    assert.deepEqual(await marks(), ["W", "W", "1", "2", "3"]);
+    await card.locator(".mark").nth(2).click();
+    assert.deepEqual(await marks(), ["W", "W", "W", "1", "2"]);
+
+    // The card's ↶ takes back one change at a time.
+    await card.locator(".pill.undo").click();
+    assert.deepEqual(await marks(), ["W", "W", "1", "2", "3"]);
+  });
+});
+
+// Each of the two split pills is one cell: its left half takes a row away, its right half adds
+// one, and a tap on the word over them lands on the half under it (§1).
+test("the split pills' halves add and remove main and warm-up rows", async (t) => {
+  await onPhone(t, async (page, site) => {
+    await page.goto(`${site}/`, { waitUntil: "networkidle" });
+    await page.waitForSelector(".card");
+    const card = page.locator(".card").first();
+    const marks = () => card.locator(".mark").allTextContents();
+    const tap = async (pill, side) => {
+      const cell = card.locator(".split").nth(pill);
+      const box = await cell.boundingBox();
+      // Just off the middle, so the tap lands on the word as well as on the half.
+      const x = side === "left" ? box.width * 0.4 : box.width * 0.6;
+      await cell.click({ position: { x, y: box.height / 2 } });
+    };
+    assert.deepEqual(await card.locator(".split").allTextContents(), ["−+Set", "−+W Set"]);
+    await tap(0, "right");
+    assert.deepEqual(await marks(), ["W", "1", "2", "3", "4"]);
+    await tap(0, "left");
+    assert.deepEqual(await marks(), ["W", "1", "2", "3"]);
+    await tap(1, "right");
+    assert.deepEqual(await marks(), ["W", "W", "1", "2", "3"]);
+    await tap(1, "left");
+    await tap(1, "left");
+    assert.deepEqual(await marks(), ["1", "2", "3"]);
+    // With no warm-up row left, the left half of the warm-up pill does nothing.
+    await tap(1, "left");
+    assert.deepEqual(await marks(), ["1", "2", "3"]);
   });
 });
 

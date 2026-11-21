@@ -24,16 +24,25 @@ export function toMarkdown(state, now, catalog) {
   lines.push("");
   for (const exercise of state.x) {
     const sets = doneOnly ? exercise.sets.filter((set) => set.done) : exercise.sets;
-    if (!sets.length) {
+    const name = wordsOf(catalog, exercise.n);
+    const side = perSideOf(catalog, exercise.n) ? SIDE_MARK : "";
+    // A card's warm-up sets get a line of their own ahead of its main sets.
+    const warmups = sets.filter((set) => set.w);
+    const mains = sets.filter((set) => !set.w);
+    const printed = [];
+    if (warmups.length) {
+      printed.push(`- ${name} (warm-up): ${setRuns(warmups, side)}`);
+    }
+    if (mains.length) {
+      printed.push(`- ${name}: ${setRuns(mains, side)}`);
+    }
+    if (!printed.length) {
       continue;
     }
-    const kind = exercise.warmup ? " (warm-up)" : "";
-    const side = perSideOf(catalog, exercise.n) ? SIDE_MARK : "";
-    let line = `- ${wordsOf(catalog, exercise.n)}${kind}: ${setRuns(sets, side)}`;
     if (exercise.note && exercise.note.trim()) {
-      line += ` ${EM_DASH} ${exercise.note.trim()}`;
+      printed[printed.length - 1] += ` ${EM_DASH} ${exercise.note.trim()}`;
     }
-    lines.push(line);
+    lines.push(...printed);
   }
   if (state.note && state.note.trim()) {
     lines.push("", `Note: ${state.note.trim()}`);

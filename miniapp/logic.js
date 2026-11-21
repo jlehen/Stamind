@@ -14,7 +14,7 @@ export const SEARCH_LIMIT = 40;
 // (DESIGN_exercise_table.md §8). The page draws no other session and sends no other log.
 export const PAYLOAD_VERSION = 2;
 // The version of the state saved on the phone. A state saved under another one is not read.
-export const STATE_VERSION = 3;
+export const STATE_VERSION = 4;
 export const OUT_OF_DATE = "This button is out of date. Send your coach any message and tap "
   + "the new one.";
 // The same for a past log opened from the calendar: the athlete tapped a day there, not a button.
@@ -98,6 +98,7 @@ export function demoSession() {
     d: "2026-09-24",
     t: "Gym: lower body strength",
     x: [
+      { n: "SQUAT/BELT_SQUAT", s: 1, lo: 5, hi: 5, kg: 120 },
       { n: "SQUAT/BELT_SQUAT", s: 3, lo: 4, hi: 6, kg: 140 },
       { n: "DEADLIFT/ROMANIAN_DEADLIFT", s: 3, lo: 6, hi: 8, kg: 90 },
       { n: "SQUAT/LEG_PRESS", s: 3, lo: 8, hi: 10, kg: 200 },
@@ -118,14 +119,15 @@ export function demoSession() {
 // The clock does not run until `startClock`, so the athlete can change the exercises first (§1).
 // Every card has an `id` that never changes, so a card's own undo finds it wherever it moved;
 // "Start over" passes the next free one, so no new card reuses an id the undo history holds.
+// A card holds the written `lines` it stands for, and each set the `p` of its line, or null.
 export function newState(session, firstId = 1) {
-  const x = (session.x || []).map((row, index) => prescribedExercise(row, index + 1));
+  const rows = session.x || [];
+  return stateOf(session, rows.map((row, index) => writtenPiece(rows, index + 1)), firstId);
+}
+
+function stateOf(session, pieces, firstId) {
+  const x = mergeAdjacent(pieces);
   x.forEach((exercise, index) => { exercise.id = firstId + index; });
-  // A warm-up is a lighter entry of the same exercise (stamind/strength/progression.md).
-  for (const exercise of x) {
-    exercise.warmup = exercise.kg !== null && x.some(
-      (other) => other.n === exercise.n && other.kg !== null && other.kg > exercise.kg);
-  }
   return {
     v: STATE_VERSION,
     r: session.r,
@@ -142,53 +144,74 @@ export function newState(session, firstId = 1) {
   };
 }
 
-function prescribedExercise(row, position) {
-  const count = Math.max(1, Number(row.s) || 1);
-  const reps = clampReps(row.hi ?? row.lo ?? ADDED_REPS);
-  const kg = row.kg ?? null;
-  const sets = [];
-  for (let i = 0; i < count; i += 1) {
-    sets.push({ reps, kg, done: false, t: null });
+// Pieces next to each other with the same exercise are one card: a warm-up and its main sets
+// (§1). The same exercise with another between stays two cards.
+function mergeAdjacent(pieces) {
+  const cards = [];
+  for (const piece of pieces) {
+    const last = cards[cards.length - 1];
+    if (!last || last.n !== piece.n) {
+      cards.push(piece);
+      continue;
+    }
+    last.lines.push(...piece.lines);
+    last.sets.push(...piece.sets);
+    last.note = [last.note, piece.note].filter(Boolean).join("; ");
   }
-  return {
-    n: row.n,
-    p: position,
-    s: count,
-    lo: row.lo ?? null,
-    hi: row.hi ?? null,
-    kg,
-    note: "",
-    sets,
-  };
+  return cards;
+}
+
+// Written row `p` (1-based) as a piece of a card, its sets as written.
+function writtenPiece(rows, p) {
+  const row = rows[p - 1];
+  const line = { p, s: Math.max(1, Number(row.s) || 1), lo: row.lo ?? null, hi: row.hi ?? null,
+                 kg: row.kg ?? null };
+  const reps = clampReps(line.hi ?? line.lo ?? ADDED_REPS);
+  const w = isWarmup(rows, row.n, line.kg);
+  const sets = Array.from({ length: line.s },
+    () => ({ reps, kg: line.kg, done: false, t: null, p, w }));
+  return { n: row.n, note: "", lines: [line], sets };
+}
+
+// A warm-up is a lighter row of the same exercise (stamind/strength/progression.md): a load
+// under the heaviest the session writes for `n`.
+function isWarmup(rows, n, kg) {
+  return kg !== null && rows.some((row) => row.n === n && row.kg != null && row.kg > kg);
 }
 
 // The state of a session already logged (§8): what the page would hold had the athlete just
-// sent `log`. The cards come in the log's order, each with its sets as done and then the
-// written sets that were not; the written exercises the log does not hold come last, unticked.
+// sent `log`. Each entry is a piece, its sets as done and then the written sets of its line
+// that were not; the written lines the log does not hold come last, unticked. Pieces next to
+// each other with the same exercise then make one card, as in `newState`.
 export function stateFromLog(session, log) {
-  const state = newState(session);
-  const written = new Map(state.x.map((card) => [card.p, card]));
-  state.x = [];
+  const rows = session.x || [];
+  const left = new Map(rows.map((row, index) => [index + 1, row]));
+  const pieces = [];
   for (const entry of log.x) {
-    const done = entry.sets.map(([reps, kg, t]) => ({ reps, kg, done: true, t }));
-    const card = written.get(entry.p);
-    if (!card) {
+    if (!left.has(entry.p)) {
       // An exercise the session did not ask for.
-      insertAdded(state, state.x.length, entry.n, done, false);
-      state.x[state.x.length - 1].note = entry.note || "";
+      const sets = entry.sets.map(([reps, kg, t]) => (
+        { reps, kg, done: true, t, p: null, w: isWarmup(rows, entry.n, kg) }));
+      pieces.push({ n: entry.n, note: entry.note || "", lines: [], sets });
       continue;
     }
-    written.delete(entry.p);
-    if (card.n !== entry.n) {
+    const piece = writtenPiece(rows, entry.p);
+    left.delete(entry.p);
+    const { w } = piece.sets[0];
+    const done = entry.sets.map(([reps, kg, t]) => ({ reps, kg, done: true, t, p: entry.p, w }));
+    piece.sets = [...done, ...piece.sets.slice(done.length)];
+    piece.note = entry.note || "";
+    if (piece.n !== entry.n) {
       // A swap: the written load was the other exercise's, as in `swapExercise`.
-      card.n = entry.n;
-      card.kg = null;
+      piece.n = entry.n;
+      piece.lines[0].kg = null;
     }
-    card.note = entry.note || "";
-    card.sets = [...done, ...card.sets.slice(done.length)];
-    state.x.push(card);
+    pieces.push(piece);
   }
-  state.x.push(...written.values());
+  for (const p of left.keys()) {
+    pieces.push(writtenPiece(rows, p));
+  }
+  const state = stateOf(session, pieces, 1);
   state.note = log.note || "";
   state.finishedAt = clockMs(log.d, log.en);
   state.startedAt = clockMs(log.d, log.st);
@@ -218,13 +241,18 @@ export function keepsSaved(saved, session) {
     || saved.x.some((card) => card.sets.some((set) => set.done));
 }
 
-// "3×8–10/side @ 30 kg" when the exercise is done one side at a time (`perSideOf`).
+// Every written line of the card, "1×5 @ 120 kg, 3×4–6 @ 140 kg", or "added" for none; a line
+// reads "3×8–10/side @ 30 kg" when the exercise is done one side at a time (`perSideOf`).
 export function prescriptionLine(exercise, perSide = false) {
-  if (exercise.s === null) {
+  if (!exercise.lines.length) {
     return "added";
   }
-  const lo = exercise.lo;
-  const hi = exercise.hi;
+  return exercise.lines.map((line) => writtenLine(line, perSide)).join(", ");
+}
+
+function writtenLine(line, perSide) {
+  const lo = line.lo;
+  const hi = line.hi;
   let reps = "";
   if (lo !== null && hi !== null && lo !== hi) {
     reps = `${lo}${EN_DASH}${hi}`;
@@ -232,11 +260,11 @@ export function prescriptionLine(exercise, perSide = false) {
     reps = String(hi ?? lo);
   }
   const side = perSide ? SIDE_MARK : "";
-  const scheme = reps ? `${exercise.s}×${reps}${side}` : `${exercise.s} sets`;
-  if (exercise.kg === null) {
+  const scheme = reps ? `${line.s}×${reps}${side}` : `${line.s} sets`;
+  if (line.kg === null) {
     return scheme;
   }
-  return `${scheme} @ ${formatKg(exercise.kg)} kg`;
+  return `${scheme} @ ${formatKg(line.kg)} kg`;
 }
 
 export function formatKg(kg) {
@@ -315,21 +343,45 @@ export function toggleDone(state, xi, si, seconds) {
   return after;
 }
 
+// The "Set" pill's "+": an unticked main row at the end, a copy of the card's last main row, or
+// of its last row when it has none (§1).
 export function addSet(state, xi) {
   const after = next(state);
   const sets = after.x[xi].sets;
-  const last = sets[sets.length - 1];
-  sets.push({ reps: last ? last.reps : ADDED_REPS, kg: last ? last.kg : null, done: false,
-              t: null });
+  const model = sets.findLast((set) => !set.w) || sets[sets.length - 1];
+  sets.push({ ...model, done: false, t: null, w: false });
   return after;
 }
 
+// The "W Set" pill's "+": an unticked warm-up row after the card's last one, a copy of it; with
+// none, at the top, a copy of the first set that stands for no line (§1).
+export function addWarmup(state, xi) {
+  const after = next(state);
+  const sets = after.x[xi].sets;
+  const at = sets.findLastIndex((set) => set.w);
+  const model = at < 0 ? { ...sets[0], p: null } : sets[at];
+  sets.splice(at + 1, 0, { ...model, done: false, t: null, w: true });
+  return after;
+}
+
+// The two pills' "−": the card's last main row, or its last warm-up row. Neither takes the
+// card's last set.
 export function removeSet(state, xi) {
-  if (state.x[xi].sets.length <= 1) {
+  return removeLast(state, xi, false);
+}
+
+export function removeWarmup(state, xi) {
+  return removeLast(state, xi, true);
+}
+
+function removeLast(state, xi, warmup) {
+  const sets = state.x[xi].sets;
+  const at = sets.findLastIndex((set) => set.w === warmup);
+  if (at < 0 || sets.length <= 1) {
     return state;
   }
   const after = next(state);
-  after.x[xi].sets.pop();
+  after.x[xi].sets.splice(at, 1);
   return after;
 }
 
@@ -337,9 +389,11 @@ export function swapExercise(state, xi, name) {
   const after = next(state);
   const exercise = after.x[xi];
   exercise.n = name;
-  // The row's position carries over so the ingest knows what this stood for (§4); its written
-  // load does not, because it was the other exercise's load.
-  exercise.kg = null;
+  // Each set keeps the line it stood for, so the ingest knows what it replaced (§4); the lines'
+  // written loads do not carry over, because they were the other exercise's.
+  for (const line of exercise.lines) {
+    line.kg = null;
+  }
   return after;
 }
 
@@ -349,32 +403,32 @@ export function addExercise(state, name, bodyweight, at = state.x.length) {
   const kg = bodyweight ? null : ADDED_KG;
   const sets = [];
   for (let i = 0; i < ADDED_SETS; i += 1) {
-    sets.push({ reps: ADDED_REPS, kg, done: false, t: null });
+    sets.push({ reps: ADDED_REPS, kg, done: false, t: null, p: null, w: false });
   }
-  return insertAdded(next(state), at, name, sets, false);
+  return insertAdded(next(state), at, name, sets);
 }
 
-// Dup: the card's exercise added right after it, with its sets as they stand and its label,
-// none ticked. Like an inserted card, it stands for no written line (§1).
+// Dup: the card's exercise added right after it, with its sets as they stand and their warm-up
+// marks, none ticked. Like an inserted card, it stands for no written line (§1).
 export function duplicateExercise(state, xi) {
   const source = state.x[xi];
-  const sets = source.sets.map((set) => ({ reps: set.reps, kg: set.kg, done: false, t: null }));
-  return insertAdded(next(state), xi + 1, source.n, sets, Boolean(source.warmup));
+  const sets = source.sets.map((set) => ({ ...set, done: false, t: null, p: null }));
+  return insertAdded(next(state), xi + 1, source.n, sets);
 }
 
-function insertAdded(after, at, name, sets, warmup) {
+function insertAdded(after, at, name, sets) {
   const id = after.nextId;
   after.nextId += 1;
-  after.x.splice(at, 0, { id, n: name, p: null, s: null, lo: null, hi: null, kg: null, note: "",
-                          warmup, sets });
+  after.x.splice(at, 0, { id, n: name, note: "", lines: [], sets });
   return after;
 }
 
-// The card's "Warm-up" / "Main" label. The page shows it and the Markdown export writes it; the
-// log does not carry it (§1).
-export function toggleWarmup(state, xi) {
+// A set's mark, warm-up or main. The page shows it and the Markdown export writes it; the log
+// does not carry it (§1).
+export function toggleWarmup(state, xi, si) {
   const after = next(state);
-  after.x[xi].warmup = !after.x[xi].warmup;
+  const set = after.x[xi].sets[si];
+  set.w = !set.w;
   return after;
 }
 
@@ -533,7 +587,8 @@ export function undoCard(history, state, card) {
 }
 
 // ---------------------------------------------------------------------------------------
-// The log payload (§4): one entry per exercise with at least one done set.
+// The log payload (§4): one entry per written line a card's done sets stand for, and one for
+// its done sets that stand for none; the card's note rides on its last entry.
 // ---------------------------------------------------------------------------------------
 
 export function buildLog(state, now) {
@@ -549,19 +604,27 @@ export function buildLog(state, now) {
     x: [],
   };
   for (const exercise of state.x) {
-    const done = exercise.sets.filter((set) => set.done);
-    if (!done.length) {
+    const byLine = new Map();
+    for (const set of exercise.sets.filter((one) => one.done)) {
+      if (!byLine.has(set.p)) {
+        byLine.set(set.p, []);
+      }
+      byLine.get(set.p).push([set.reps, set.kg, set.t ?? 0]);
+    }
+    if (!byLine.size) {
       continue;
     }
-    const entry = { n: exercise.n };
-    if (exercise.p !== null && exercise.p !== undefined) {
-      entry.p = exercise.p;
+    for (const [p, sets] of byLine) {
+      const entry = { n: exercise.n };
+      if (p !== null) {
+        entry.p = p;
+      }
+      entry.sets = sets;
+      log.x.push(entry);
     }
-    entry.sets = done.map((set) => [set.reps, set.kg, set.t ?? 0]);
     if (exercise.note && exercise.note.trim()) {
-      entry.note = exercise.note.trim();
+      log.x[log.x.length - 1].note = exercise.note.trim();
     }
-    log.x.push(entry);
   }
   if (state.note && state.note.trim()) {
     log.note = state.note.trim();

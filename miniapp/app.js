@@ -20,7 +20,6 @@ const ui = {
   tally: document.getElementById("tally"),
   headNotes: document.getElementById("head-notes"),
   openedNote: document.getElementById("opened-note"),
-  warmupHint: document.getElementById("warmup-hint"),
   back: document.getElementById("back"),
   edit: document.getElementById("edit"),
   restValue: document.getElementById("rest-value"),
@@ -306,16 +305,8 @@ function exerciseCard(exercise, xi) {
   const name = el("div", "card-name");
   const words = logic.wordsOf(catalog, exercise.n);
   name.append(cardTitle(exercise, xi));
-  const line = el("div", "card-line");
-  const kind = button(exercise.warmup ? "Warm-up" : "Main",
-    exercise.warmup ? "kind warmup" : "kind", () => apply(logic.toggleWarmup(state, xi), id));
-  kind.setAttribute("aria-label", exercise.warmup
-    ? "Warm-up sets, tap to mark them as the main sets"
-    : "Main sets, tap to mark them as warm-up sets");
-  line.append(kind);
-  line.append(el("span", "card-pres",
+  name.append(el("div", "card-pres",
     logic.prescriptionLine(exercise, logic.perSideOf(catalog, exercise.n))));
-  name.append(line);
   head.append(name);
   const moves = el("div", "moves");
   moves.append(button("↑", "move", () => apply(logic.moveExercise(state, xi, -1))));
@@ -336,15 +327,21 @@ function exerciseCard(exercise, xi) {
     card.append(strip);
   }
 
-  exercise.sets.forEach((set, si) => card.append(setRow(exercise, xi, set, si)));
+  // The main rows are numbered from 1; a warm-up row reads "W" (§1).
+  let number = 0;
+  exercise.sets.forEach((set, si) => {
+    if (!set.w) {
+      number += 1;
+    }
+    card.append(setRow(exercise, xi, set, si, number));
+  });
 
   const tools = el("div", "tools");
   const undoCard = button("↶", "pill undo", () => undo(logic.undoCard(history, state, id)));
   undoCard.disabled = !logic.canUndoCard(history, id);
   undoCard.setAttribute("aria-label", `Undo the last change to ${words}`);
   tools.append(undoCard);
-  tools.append(button("+ Set", "pill", () => apply(logic.addSet(state, xi), id)));
-  tools.append(button("− Set", "pill", () => apply(logic.removeSet(state, xi), id)));
+  tools.append(...setButtons(xi, id));
   tools.append(button("⇆ Replace", "pill", () => openSearch("swap", xi)));
   tools.append(button("⤵ Insert", "pill", () => openSearch("insert", xi)));
   tools.append(button("❐ Dup", "pill", () => apply(logic.duplicateExercise(state, xi))));
@@ -363,6 +360,29 @@ function exerciseCard(exercise, xi) {
     () => applyQuiet(logic.setExerciseNote(state, xi, note.value), id));
   card.append(note);
   return card;
+}
+
+// The card's set buttons, two split pills: a main row and a warm-up row, each taken away by
+// the pill's left half and added by its right half (§1).
+function setButtons(xi, id) {
+  const act = (change) => () => apply(change(state, xi), id);
+  return [
+    splitPill("Set", "split", ["Remove the last main set", act(logic.removeSet)],
+              ["Add a main set", act(logic.addSet)]),
+    splitPill("W Set", "split warmup", ["Remove the last warm-up set", act(logic.removeWarmup)],
+              ["Add a warm-up set", act(logic.addWarmup)]),
+  ];
+}
+
+// One cell that looks like a pill: two buttons, "−" and "+", under a word that lets taps through.
+function splitPill(word, className, [lessLabel, onLess], [moreLabel, onMore]) {
+  const cell = el("div", className);
+  const less = button("−", "half less", onLess);
+  less.setAttribute("aria-label", lessLabel);
+  const more = button("+", "half more", onMore);
+  more.setAttribute("aria-label", moreLabel);
+  cell.append(less, more, el("span", "split-word", word));
+  return cell;
 }
 
 // Every title is chips, one per movement, a chain's opened by ⛓. A tap on a chip boxes it with
@@ -423,10 +443,12 @@ function togglePhotos(name) {
   render();
 }
 
-function setRow(exercise, xi, set, si) {
+// `number` is the row's place among the card's main rows.
+function setRow(exercise, xi, set, si, number) {
   const id = exercise.id;
   const row = el("div", set.done ? "set done" : "set");
-  row.append(el("div", "set-index", String(si + 1)));
+  row.classList.toggle("warmup", set.w);
+  row.append(setMark(exercise, xi, set, si, number));
 
   const perSide = logic.perSideOf(catalog, exercise.n);
   row.append(stepper({
@@ -460,9 +482,24 @@ function setRow(exercise, xi, set, si) {
     apply(logic.toggleDone(started, xi, si, secondsNow(started)), id);
   });
   check.setAttribute("aria-pressed", String(set.done));
-  check.setAttribute("aria-label", set.done ? `Set ${si + 1} done` : `Mark set ${si + 1} done`);
+  const which = set.w ? "Warm-up set" : `Set ${number}`;
+  check.setAttribute("aria-label", set.done ? `${which} done` : `Mark ${which.toLowerCase()} done`);
   row.append(check);
   return row;
+}
+
+// The row's mark, "W" or its number, is the button that switches it between warm-up and main.
+// Its look, and the warm-up row's, lives here and in `.mark` and `.set.warmup` (style.css).
+function setMark(exercise, xi, set, si, number) {
+  const flip = () => apply(logic.toggleWarmup(state, xi, si), exercise.id);
+  if (set.w) {
+    const mark = button("W", "mark warmup", flip);
+    mark.setAttribute("aria-label", "Warm-up set, tap to make it a main set");
+    return mark;
+  }
+  const mark = button(String(number), "mark", flip);
+  mark.setAttribute("aria-label", `Set ${number}, tap to make it a warm-up set`);
+  return mark;
 }
 
 function stepper(spec) {
@@ -540,11 +577,10 @@ function orderRow(exercise, xi) {
     row.classList.add("swapped");
   }
   row.setAttribute("aria-pressed", String(exercise.id === orderPicked));
-  row.append(el("span", exercise.warmup ? "order-kind warmup" : "order-kind",
-                exercise.warmup ? "Warm-up" : "Main"));
   row.append(el("span", "order-name", logic.wordsOf(catalog, exercise.n)));
-  const kg = exercise.sets[0].kg;
-  const load = kg === null ? logic.formatKg(kg) : `${logic.formatKg(kg)} kg`;
+  // The card's heaviest load, so a warm-up row does not stand for the card.
+  const loads = exercise.sets.map((set) => set.kg).filter((kg) => kg !== null);
+  const load = loads.length ? `${logic.formatKg(Math.max(...loads))} kg` : logic.formatKg(null);
   const ticked = exercise.sets.every((set) => set.done);
   row.append(el("span", "order-load", ticked ? `✓ ${load}` : load));
   return row;
@@ -792,7 +828,6 @@ function showOpened() {
   ui.back.hidden = false;
   ui.edit.hidden = false;
   ui.openedNote.hidden = false;
-  ui.warmupHint.hidden = true;
   ui.reset.hidden = true;
 }
 

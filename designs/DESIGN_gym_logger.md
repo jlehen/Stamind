@@ -33,20 +33,26 @@ card's movement pattern as a filter, and says so beside the "Search every exerci
 that lifts it ("— only single leg"); Insert and Add search everything. "❐ Dup" puts a copy
 of the card right after it: the same exercise, its sets with the reps and kilograms they
 show now, none ticked. Like an inserted card, the copy stands for no line of the session.
-The card's eight buttons (↶, + Set, − Set, Replace, Insert, Dup, Del, Pic) sit in two rows of
-four, so their labels stay short. Each number box says what it holds, "reps" or "kg", under
-the number.
+The card's eight cells (↶, Set, W Set, Replace, Insert, Dup, Del, Pic) sit in two rows of
+four, so their labels stay short. "Set" and "W Set" are split pills: a tap on the left half,
+"−", takes a row away, and a tap on the right half, "+", adds one. Each number box says what
+it holds, "reps" or "kg", under the number.
 
-A warm-up has its own card. The strength planner writes it as a lighter entry of the same
-exercise ahead of the main sets (`stamind/strength/progression.md`), and the page draws one
-card per entry. A line at the top of the page says so, and each card carries a tag,
-"Warm-up" or "Main", that a tap switches. Here is an example. It is Thursday, and the
-session holds "Squat: belt squat 1×5 @ 120, 3×4–6 @ 140" and a leg press at 200 kg. The 120 kg
-card opens as "Warm-up", because a heavier belt squat card exists; the other two open as
-"Main". The athlete wants a warm-up on the leg press too. They tap Dup on it, lower the
-copy to 100 kg, move it up, and tap its tag to make it "Warm-up". The tag stays on the page
-and in the Markdown export: the log does not carry it, since the comparison already shows a
-light set that fits no written line as an extra, never as a miss
+A warm-up and its main sets are one card. The strength planner writes a warm-up as a lighter
+row of the same exercise right before the main sets (`stamind/strength/progression.md`), so
+rows of the same exercise next to each other make one card; the same exercise with another
+between stays two cards. Each set row still stands for its own written line. Here is an
+example. It is Thursday, and the session holds "Squat: belt squat 1×5 @ 120, 3×4–6 @ 140" and a
+leg press at 200 kg. The belt squat is one card, "1×5 @ 120 kg, 3×4–6 @ 140 kg" under its name,
+its four rows marked W, 1, 2 and 3. A row opens as a warm-up when its line has a load and the
+session writes a heavier one for the same exercise. A warm-up row is tinted amber, and a tap on
+a row's mark switches it between warm-up and main. The athlete wants a warm-up on the leg press
+too. They tap the "+" of its "W Set" pill: a row marked W appears on top at 200 kg, and they
+lower it to 100 kg. That "+" puts a copy of the last warm-up row after it, or a copy of the
+first set on top when there is none, and the "−" removes the last warm-up row. The "Set" pill
+does the same at the end of the main rows, and neither "−" removes a card's last set. The marks
+stay on the page and in the Markdown export: the log does not carry them, since the comparison
+already shows a light set that fits no written line as an extra, never as a miss
 (DESIGN_strength_planned_vs_done.md §3).
 
 A tap can be taken back. The header's "Undo" takes back the last change anywhere on the
@@ -60,14 +66,13 @@ The undo history is saved on the phone with the rest, so a reopened page can sti
 
 A card's ↑ and ↓ move it one place. A card is a third of a screen tall, so a longer move
 goes through the header's "Order" button. It opens a sheet with one short line per card: its
-tag, its name and its first set's load, with a ✓ once every set is ticked. A tap picks a line,
-and a tap on another line makes the two cards trade places; a second tap on the picked line
-lets it go. Each trade is one Undo step. Here is an example. It is Monday, and the session
-pairs the hip thrust with the shoulder press and the lunge with the row. The shoulder press
-bench is taken. The athlete opens Order, taps the shoulder press warm-up and the row warm-up,
-then the two main cards: four taps, and the hip thrust now goes with the row and the lunge
-with the shoulder press. Not handled: moving a group past a group of another size in one
-go, which stays a card at a time.
+name and its heaviest load, with a ✓ once every set is ticked. A tap picks a line, and a tap
+on another line makes the two cards trade places; a second tap on the picked line lets it go.
+Each trade is one Undo step. Here is an example. It is Monday, and the session pairs the hip
+thrust with the shoulder press and the lunge with the row. The shoulder press bench is taken.
+The athlete opens Order and taps the shoulder press, then the row: two taps, warm-ups
+included, and the hip thrust now goes with the row and the lunge with the shoulder press. Not
+handled: moving a group past a group of another size in one go, which stays a card at a time.
 
 The clock does not run when the page opens. At 17:50, in the changing room, the athlete
 sees the leg press is out of order and swaps it before walking in. The header shows a
@@ -116,11 +121,13 @@ at 18:30, like any set ticked after Finish.
 The athlete also keeps their own training notes in a text file. Under "Add an exercise" is
 "Export to Markdown", which copies the session to the clipboard as a few lines of Markdown:
 a `### 2026-09-24 [Gym: lower body strength]` heading, the clock times, the coach's note,
-then one line per exercise such as "- [Squat] Belt squat: 1x5 (120 kg), 2x6 (140 kg)", with the
-exercise's note after a dash and the session note last. Before any set is ticked it copies
-the session as the page holds it, so the athlete can paste the day's workout ahead of time;
-once a set is ticked it copies only the ticked sets, the way the log does. A phone that
-refuses the clipboard gets the same sheet the log uses, with the text to select by hand.
+then one line per exercise such as "- [Squat] Belt squat: 1x5 (130 kg), 2x6 (140 kg)", its
+warm-up sets on a line of their own ahead of it, "- [Squat] Belt squat (warm-up): 1x5
+(120 kg)". The exercise's note follows a dash on its last line, and the session note comes
+last. Before any set is ticked it copies the session as the page holds it, so the athlete
+can paste the day's workout ahead of time; once a set is ticked it copies only the ticked
+sets, the way the log does. A phone that refuses the clipboard gets the same sheet the log
+uses, with the text to select by hand.
 
 A card's title is chips, one per movement. A tap on a chip boxes it with Replace, Remove and
 Chain with, and Chain with on a plain exercise starts a chain: several movements done back
@@ -204,8 +211,10 @@ reps are rounds; the version stays 2 (DESIGN_strength_combos.md §6).
 
 Each set is `[reps, kg, seconds since the session started]`; `kg` is null for a
 bodyweight exercise. `p` is the position of the prescribed row this exercise stands for;
-an added exercise has no `p`, a swapped one keeps the `p` of the row it replaced. A
-prescribed exercise not done is simply absent. `st` and `en` are local clock times, and
+an added exercise has no `p`, a swapped one keeps the `p` of the row it replaced. A card
+holding several rows (§1) sends an entry per row its done sets stand for, and one with no `p`
+for a set that stands for none; its note rides on its last entry. A prescribed exercise not
+done is simply absent. `st` and `en` are local clock times, and
 `d` is the day the athlete lifted, from the phone's clock at the first Finish: a session
 done a day early or late is logged on the day it happened, and `r` still says which session
 it was. A log sent again after an edit carries the same `d`, `st` and `en`, so it lands on
@@ -288,10 +297,13 @@ gym day. The sheet's "Done" part names the five exercises done as written on one
 it does not say how many reps and kilograms each set had. Under the sheet is a button,
 "🏋️ Open the gym log". A tap opens the gym logger in the same window, on Thursday's log.
 
-The page draws one card per exercise, in the order the log holds them. Each set shows its
-reps and kilograms, ticked. A written set that was not done follows the done ones on its
-card, unticked. A written exercise that was not done at all comes after the last logged
-card, unticked. The header shows the session's length, "38:00 in total".
+The page draws the log's entries in the order it holds them. Each set shows its reps and
+kilograms, ticked. A written set of the entry's line that was not done follows the done ones,
+unticked. A written line that was not done at all comes after the last logged entry,
+unticked. Entries next to each other with the same exercise then make one card, as in the
+gym (§1). A log sent before a warm-up shared its main sets' card opens too: a warm-up done
+apart from its main sets, with another exercise between, stays a card of its own. The header
+shows the session's length, "38:00 in total".
 
 The page opens locked. The steppers, the ticks, the card buttons and the notes are out of
 reach, and there is no button to send. The header has two buttons. "‹ Calendar" goes back
@@ -318,8 +330,9 @@ change that is not sent is lost when the page closes.
 "Start over" are not offered on an opened log: each restarts the clock, and the next send
 would be dated today. A set ticked here is stamped at the session's end, like any set ticked after Finish.
 
-**The "Warm-up" tags** are the ones the page gives a session it opens for the first time
-(§1), since the log does not carry them.
+**The warm-up marks** are the ones §1 gives a set's written line, since the log does not carry
+them. A set that stands for no line is a warm-up when it is lighter than the heaviest load the
+session writes for its exercise.
 
 Not handled:
 

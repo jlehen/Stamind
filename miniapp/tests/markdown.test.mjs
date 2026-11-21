@@ -76,8 +76,24 @@ test("an exercise done one side at a time says so after its reps in the export",
                /^- \[Row\] One arm bent over row: 3x10\/side \(30 kg\)$/m);
 });
 
-test("a card marked as a warm-up says so in the export", () => {
-  const state = logic.toggleWarmup(logic.newState(SESSION), 2);
-  assert.match(toMarkdown(state, START, CATALOG),
-               /^- \[Squat\] Leg extension \(warm-up\): 2x15 \(45 kg\)$/m);
+test("a set marked as a warm-up goes on a warm-up line ahead of the card's main sets", () => {
+  const state = logic.toggleWarmup(logic.newState(SESSION), 2, 0);
+  const text = toMarkdown(state, START, CATALOG);
+  assert.ok(text.includes([
+    "- [Squat] Leg extension (warm-up): 1x15 (45 kg)",
+    "- [Squat] Leg extension: 1x15 (45 kg)\n",
+  ].join("\n")), text);
+});
+
+test("a card with a written warm-up prints it on its own line, the note on the last line", () => {
+  // "Belt squat 1×5 @ 120, 3×4–6 @ 140" is one card on the page.
+  const warmup = { n: "SQUAT/BELT_SQUAT", s: 1, lo: 5, hi: 5, kg: 120 };
+  let state = logic.newState({ ...SESSION, x: [warmup, ...SESSION.x] });
+  state = logic.setExerciseNote(state, 0, "deep");
+  assert.equal(state.x.length, 3);
+  const text = toMarkdown(state, START, CATALOG);
+  assert.ok(text.includes([
+    "- [Squat] Belt squat (warm-up): 1x5 (120 kg)",
+    "- [Squat] Belt squat: 3x6 (140 kg) — deep\n",
+  ].join("\n")), text);
 });

@@ -104,22 +104,24 @@ with no load recorded: its load is unknown, not light. Reps are shown and not co
 near the load counts whatever its reps. The `light` flag on a planned line changes nothing
 here.
 
-**A logged set counts on its card's line.** The logger page draws one card per planned line,
-and the athlete ticks each set on a card. On Thursday the row had one line, 2 sets at 110 kg,
-and one card. On it the athlete ticked 95, 110 and 110. The two sets at 110 fill the line.
-The set at 95 kg is not near 110 (the limit is 99), so it is an extra: shown in the Done
-cell, not counted. The row counts 2 of 2. Its mark is still ✓. An extra set is never marked,
-because it is almost always a warm-up the strength planner did not write.
+**A logged set counts on its card's line.** On the logger page each set row of a card stands for
+one planned line, a warm-up line and its working line sharing one card (DESIGN_gym_logger.md
+§1), and the athlete ticks each set there. On Thursday the row had one line, 2 sets at 110 kg,
+and one card. On it the athlete ticked 95, 110 and 110. The two sets at 110 fill the line. The
+set at 95 kg is not near 110 (the limit is 99), so it is an extra: shown in the Done cell, not
+counted. The row counts 2 of 2. Its mark is still ✓. An extra set is never marked, because it is
+almost always a warm-up the strength planner did not write.
 
 A card the athlete swapped to another exercise counts on its line too, up to the line's
 number of sets, with no load check: a chest press load says nothing about a push press
-load. On Thursday the athlete swapped the chest press in on both push press cards, a warm-up
+load. On Thursday the athlete swapped the chest press in on the push press card, a warm-up
 line and a working line, so the push press counts 3 of 3 and is marked "swapped". A swap is
 the athlete's own word on the page, not a guess. It happens for ordinary reasons: the
 machine is taken, or the session named the wrong exercise, as it did on Thursday.
 
-**A set with no card counts by name.** That is a card the athlete added on the page, and
-every set of a session the watch recorded alone. Take the exercise's sets heaviest first.
+**A set with no card counts by name.** That is a set the athlete added on the page, on a card
+of its own or as a warm-up row on a card with no written warm-up, and every set of a session
+the watch recorded alone. Take the exercise's sets heaviest first.
 Each set counts on the heaviest planned line of the same exercise that it is near and that
 still has room. A set that fits no line is an extra. On Monday the belt squat was planned as
 "1×5 @ 110, 2×4–6 @ 125", and the watch recorded 110, 130 and 130 kg. The two sets at 130 kg

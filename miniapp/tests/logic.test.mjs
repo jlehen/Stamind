@@ -36,6 +36,11 @@ function tickSet(state, xi, si, seconds) {
   return logic.toggleDone(state, xi, si, seconds);
 }
 
+// The positions of the written lines each card stands for.
+function positions(state) {
+  return state.x.map((x) => x.lines.map((line) => line.p));
+}
+
 test("the session in the URL hash is read as §3 wrote it", () => {
   const session = logic.sessionFromHash(EXAMPLE_HASH);
   assert.equal(session.v, 2);
@@ -69,12 +74,13 @@ test("a new state prefills every set with the top of the rep range and the writt
   const state = exampleState();
   assert.equal(state.x.length, 2);
   assert.deepEqual(state.x[0].sets, [
-    { reps: 6, kg: 140, done: false, t: null },
-    { reps: 6, kg: 140, done: false, t: null },
-    { reps: 6, kg: 140, done: false, t: null },
+    { reps: 6, kg: 140, done: false, t: null, p: 1, w: false },
+    { reps: 6, kg: 140, done: false, t: null, p: 1, w: false },
+    { reps: 6, kg: 140, done: false, t: null, p: 1, w: false },
   ]);
   assert.equal(state.x[1].sets[0].kg, null);
-  assert.deepEqual([state.x[0].p, state.x[1].p], [1, 2]);
+  assert.deepEqual(positions(state), [[1], [2]]);
+  assert.deepEqual(state.x[0].lines, [{ p: 1, s: 3, lo: 4, hi: 6, kg: 140 }]);
 });
 
 test("the prescription line reads the way the coach wrote it", () => {
@@ -91,9 +97,9 @@ test("an exercise done one side at a time says so after its reps", () => {
   assert.equal(logic.perSideOf(catalog, "ROW/ONE_ARM_BENT_OVER_ROW"), true);
   assert.equal(logic.perSideOf(catalog, "SQUAT/BELT_SQUAT"), false);
   assert.equal(logic.perSideOf(catalog, "SQUAT/MOON_SQUAT"), false);
-  const row = { s: 3, lo: 8, hi: 10, kg: 30 };
-  assert.equal(logic.prescriptionLine(row, true), "3×8–10/side @ 30 kg");
-  assert.equal(logic.prescriptionLine(row, false), "3×8–10 @ 30 kg");
+  const card = { lines: [{ p: 1, s: 3, lo: 8, hi: 10, kg: 30 }] };
+  assert.equal(logic.prescriptionLine(card, true), "3×8–10/side @ 30 kg");
+  assert.equal(logic.prescriptionLine(card, false), "3×8–10 @ 30 kg");
 });
 
 test("the log holds the done sets only, and the day comes from the phone's clock", () => {
@@ -152,9 +158,11 @@ test("a full twelve-exercise session still fits in one message", () => {
   // §4: forty-two sets of twelve exercises take about 1 KB.
   let state = logic.newState({
     v: 2, r: 727, d: "2026-09-24", t: "Gym: everything",
-    x: Array.from({ length: 12 },
-      () => ({ n: "ROW/SEATED_CABLE_ROW", s: 4, lo: 8, hi: 10, kg: 60 })),
+    // Two exercises in turn, so the twelve rows stay twelve cards.
+    x: Array.from({ length: 12 }, (_, i) => (
+      { n: i % 2 ? "ROW/SEATED_CABLE_ROW" : "SQUAT/LEG_PRESS", s: 4, lo: 8, hi: 10, kg: 60 })),
   });
+  assert.equal(state.x.length, 12);
   state = logic.startClock(state, START);
   for (let xi = 0; xi < 12; xi += 1) {
     for (let si = 0; si < 4; si += 1) {
@@ -171,7 +179,8 @@ test("a swapped exercise keeps the position of the row it replaced", () => {
   state = tickSet(state, 0, 0, 30);
   state = logic.swapExercise(state, 0, "SQUAT/LEG_PRESS");
   assert.equal(state.x[0].n, "SQUAT/LEG_PRESS");
-  assert.equal(state.x[0].p, 1);
+  assert.deepEqual(positions(state), [[1], [2]]);
+  assert.deepEqual(state.x[0].sets.map((set) => set.p), [1, 1, 1]);
   // The written load belonged to the other exercise, so the line drops it and keeps the reps.
   assert.equal(logic.prescriptionLine(state.x[0]), "3×4–6");
   const entry = logic.buildLog(state, END).x[0];
@@ -182,8 +191,9 @@ test("an added exercise has no position, and has a load unless it is bodyweight"
   let state = exampleState();
   state = logic.addExercise(state, "CURL/BARBELL_CURL", false);
   state = logic.addExercise(state, "PULL_UP/PULL_UP", true);
-  assert.equal(state.x[2].p, null);
-  assert.equal(state.x[2].sets.length, logic.ADDED_SETS);
+  assert.deepEqual(state.x[2].lines, []);
+  assert.deepEqual(state.x[2].sets.map((set) => [set.p, set.w]),
+                   Array(logic.ADDED_SETS).fill([null, false]));
   assert.equal(state.x[2].sets[0].kg, logic.ADDED_KG);
   assert.equal(state.x[3].sets[0].kg, null);
   state = tickSet(state, 2, 0, 500);
@@ -196,7 +206,7 @@ test("moving an exercise reorders the cards and leaves the positions alone", () 
   let state = exampleState();
   state = logic.moveExercise(state, 1, -1);
   assert.deepEqual(state.x.map((x) => x.n), ["PULL_UP/PULL_UP", "SQUAT/BELT_SQUAT"]);
-  assert.deepEqual(state.x.map((x) => x.p), [2, 1]);
+  assert.deepEqual(positions(state), [[2], [1]]);
   // Moving past either end changes nothing.
   assert.deepEqual(logic.moveExercise(state, 0, -1), state);
   assert.deepEqual(logic.moveExercise(state, 1, 1), state);
@@ -208,7 +218,7 @@ test("swapping two exercises makes them trade places and leaves the positions al
   state = logic.swapExercises(state, 0, 2);
   assert.deepEqual(state.x.map((x) => x.n),
                    ["ROW/SEATED_CABLE_ROW", "PULL_UP/PULL_UP", "SQUAT/BELT_SQUAT"]);
-  assert.deepEqual(state.x.map((x) => x.p), [null, 2, 1]);
+  assert.deepEqual(positions(state), [[], [2], [1]]);
   // A card with itself, or a place that is not there, changes nothing.
   assert.deepEqual(logic.swapExercises(state, 1, 1), state);
   assert.deepEqual(logic.swapExercises(state, 0, 3), state);
@@ -230,7 +240,7 @@ test("adding a set copies the last one and leaves it unticked", () => {
   state = logic.setKg(state, 0, 2, 145);
   state = tickSet(state, 0, 2, 300);
   state = logic.addSet(state, 0);
-  assert.deepEqual(state.x[0].sets[3], { reps: 6, kg: 145, done: false, t: null });
+  assert.deepEqual(state.x[0].sets[3], { reps: 6, kg: 145, done: false, t: null, p: 1, w: false });
 });
 
 test("the kilogram stepper walks down to zero and one tap further to bodyweight", () => {
@@ -384,7 +394,7 @@ test("the header shows the session's own date in words", () => {
 
 test("the saved state is keyed by its version and the session's date", () => {
   // A state saved under the old names has another version, so it is never read.
-  assert.equal(logic.storageKey("2026-11-16"), "stamind-gym-v3-d2026-11-16");
+  assert.equal(logic.storageKey("2026-11-16"), "stamind-gym-v4-d2026-11-16");
   assert.equal(logic.newState(logic.demoSession()).v, logic.STATE_VERSION);
 });
 
@@ -419,7 +429,7 @@ test("an inserted exercise lands after its card, with an id no other card has", 
   state = logic.addExercise(state, "SQUAT/LEG_PRESS", false, 1);
   assert.deepEqual(state.x.map((x) => x.n),
                    ["SQUAT/BELT_SQUAT", "SQUAT/LEG_PRESS", "PULL_UP/PULL_UP"]);
-  assert.equal(state.x[1].p, null);
+  assert.deepEqual(state.x[1].lines, []);
   state = logic.addExercise(state, "CURL/BARBELL_CURL", false);
   assert.deepEqual(state.x.map((x) => x.id), [1, 3, 2, 4]);
   // "Start over" numbers the written cards after every id the undo history may still hold.
@@ -427,37 +437,141 @@ test("an inserted exercise lands after its card, with an id no other card has", 
   assert.deepEqual(over.x.map((x) => x.id), [5, 6]);
 });
 
-test("a lighter entry of the same exercise starts as the warm-up, every other card as main", () => {
-  // Thursday: "Belt squat 1×5 @ 120, 3×4–6 @ 140", a pull-up, and a leg press on its own.
-  const state = logic.newState({ v: 2, r: 1, d: "2026-09-24", x: [
-    { n: "SQUAT/BELT_SQUAT", s: 1, lo: 5, hi: 5, kg: 120 },
-    { n: "SQUAT/BELT_SQUAT", s: 3, lo: 4, hi: 6, kg: 140 },
-    { n: "PULL_UP/PULL_UP", s: 3, lo: 6, hi: 8, kg: null },
-    { n: "SQUAT/LEG_PRESS", s: 3, lo: 8, hi: 10, kg: 200 },
+// Thursday: "Belt squat 1×5 @ 120, 3×4–6 @ 140", a pull-up, and a leg press on its own.
+const THURSDAY = { v: 2, r: 1, d: "2026-09-24", t: "Gym", x: [
+  { n: "SQUAT/BELT_SQUAT", s: 1, lo: 5, hi: 5, kg: 120 },
+  { n: "SQUAT/BELT_SQUAT", s: 3, lo: 4, hi: 6, kg: 140 },
+  { n: "PULL_UP/PULL_UP", s: 3, lo: 6, hi: 8, kg: null },
+  { n: "SQUAT/LEG_PRESS", s: 3, lo: 8, hi: 10, kg: 200 },
+] };
+
+test("rows next to each other with the same exercise are one card, its lines in order", () => {
+  const state = logic.newState(THURSDAY);
+  assert.deepEqual(state.x.map((x) => x.n),
+                   ["SQUAT/BELT_SQUAT", "PULL_UP/PULL_UP", "SQUAT/LEG_PRESS"]);
+  assert.deepEqual(positions(state), [[1, 2], [3], [4]]);
+  assert.deepEqual(state.x[0].sets.map((set) => [set.reps, set.kg, set.p]),
+                   [[5, 120, 1], [6, 140, 2], [6, 140, 2], [6, 140, 2]]);
+  assert.equal(logic.prescriptionLine(state.x[0]), "1×5 @ 120 kg, 3×4–6 @ 140 kg");
+  assert.deepEqual(state.x.map((x) => x.id), [1, 2, 3]);
+  assert.equal(state.nextId, 4);
+  // The same exercise with another one between stays two cards; a chain merges the same way.
+  const chain = "HIP_RAISE/KETTLEBELL_SWING>SQUAT/GOBLET_SQUAT";
+  const apart = logic.newState({ ...THURSDAY, x: [
+    ...THURSDAY.x,
+    { n: "SQUAT/BELT_SQUAT", s: 2, lo: 8, hi: 8, kg: 100 },
+    { n: chain, s: 1, lo: 5, hi: 5, kg: 8 },
+    { n: chain, s: 3, lo: 5, hi: 8, kg: 12 },
   ] });
-  assert.deepEqual(state.x.map((x) => x.warmup), [true, false, false, false]);
-  const toggled = logic.toggleWarmup(state, 3);
-  assert.equal(toggled.x[3].warmup, true);
-  // The label stays on the page: the log is the same either way.
-  const ticked = logic.toggleDone(logic.startClock(toggled, START), 3, 0, 60);
+  assert.deepEqual(apart.x.map((x) => x.n), ["SQUAT/BELT_SQUAT", "PULL_UP/PULL_UP",
+    "SQUAT/LEG_PRESS", "SQUAT/BELT_SQUAT", chain]);
+  assert.deepEqual(positions(apart), [[1, 2], [3], [4], [5], [6, 7]]);
+});
+
+test("a lighter line of the same exercise opens as warm-up sets, every other set as main", () => {
+  const state = logic.newState(THURSDAY);
+  assert.deepEqual(state.x.map((x) => x.sets.map((set) => set.w)),
+                   [[true, false, false, false], [false, false, false], [false, false, false]]);
+  // A tap switches one row and leaves the card's other rows alone.
+  const toggled = logic.toggleWarmup(state, 2, 0);
+  assert.deepEqual(toggled.x[2].sets.map((set) => set.w), [true, false, false]);
+  assert.deepEqual(logic.toggleWarmup(toggled, 2, 0), state);
+  // The mark stays on the page: the log is the same either way.
+  const ticked = logic.toggleDone(logic.startClock(toggled, START), 2, 0, 60);
   assert.deepEqual(logic.buildLog(ticked, END).x,
                    [{ n: "SQUAT/LEG_PRESS", p: 4, sets: [[10, 200, 60]] }]);
+});
+
+test("a warm-up row goes after the last warm-up row, or on top when there is none", () => {
+  let state = logic.newState(THURSDAY);
+  state = logic.setKg(state, 0, 0, 110);
+  state = tickSet(logic.startClock(state, START), 0, 0, 30);
+  // The belt squat has a warm-up row: the new one copies it, unticked, under its line.
+  state = logic.addWarmup(state, 0);
+  assert.deepEqual(state.x[0].sets.slice(0, 3).map((set) => [set.reps, set.kg, set.p, set.w,
+                                                             set.done]),
+                   [[5, 110, 1, true, true], [5, 110, 1, true, false], [6, 140, 2, false, false]]);
+  // The leg press has none: the new row goes on top, a copy of the first set the athlete
+  // lowers, and it stands for no line.
+  state = logic.setReps(state, 2, 0, 9);
+  state = logic.addWarmup(state, 2);
+  assert.deepEqual(state.x[2].sets.map((set) => [set.reps, set.kg, set.p, set.w]),
+                   [[9, 200, null, true], [9, 200, 4, false], [10, 200, 4, false],
+                    [10, 200, 4, false]]);
+});
+
+test("the Set pill adds and removes main rows, the W Set pill warm-up rows", () => {
+  let state = logic.newState(THURSDAY);
+  // The belt squat's last row is made a warm-up: a new main row copies the last main row.
+  state = logic.setKg(logic.toggleWarmup(state, 0, 3), 0, 2, 145);
+  state = logic.addSet(state, 0);
+  assert.deepEqual(state.x[0].sets.map((set) => [set.kg, set.p, set.w]),
+                   [[120, 1, true], [140, 2, false], [145, 2, false], [140, 2, true],
+                    [145, 2, false]]);
+  // The Set pill's "−" takes the last main row, the W Set pill's the last warm-up row.
+  state = logic.removeSet(logic.removeSet(state, 0), 0);
+  state = logic.removeWarmup(state, 0);
+  assert.deepEqual(state.x[0].sets.map((set) => [set.kg, set.w]), [[120, true], [140, false]]);
+  // A card with no main row: a new main row copies its last row.
+  state = logic.removeSet(state, 0);
+  assert.deepEqual(state.x[0].sets.map((set) => set.w), [true]);
+  // Neither "−" takes the last set, and the W Set pill's does nothing with no warm-up row.
+  assert.equal(logic.removeWarmup(state, 0), state);
+  assert.equal(logic.removeSet(state, 0), state);
+  assert.equal(logic.removeWarmup(state, 1), state);
+  state = logic.addSet(state, 0);
+  assert.deepEqual(state.x[0].sets[1], { reps: 5, kg: 120, done: false, t: null, p: 1, w: false });
+});
+
+test("a card's done sets go out as one entry per line, the note on the card's last one", () => {
+  let state = logic.startClock(logic.newState(THURSDAY), START);
+  // The athlete makes the 120 kg line a main set, adds a warm-up of their own on top, then
+  // marks the 120 kg line a warm-up again.
+  state = logic.toggleWarmup(state, 0, 0);
+  state = logic.addWarmup(state, 0);
+  state = logic.setKg(state, 0, 0, 60);
+  state = logic.toggleWarmup(state, 0, 1);
+  assert.deepEqual(state.x[0].sets.map((set) => [set.kg, set.p, set.w]),
+                   [[60, null, true], [120, 1, true], [140, 2, false], [140, 2, false],
+                    [140, 2, false]]);
+  for (const [si, seconds] of [[0, 10], [1, 100], [2, 200], [3, 300]]) {
+    state = tickSet(state, 0, si, seconds);
+  }
+  state = logic.setExerciseNote(state, 0, "deep");
+  state = tickSet(state, 1, 0, 400);
+  assert.deepEqual(logic.buildLog(state, END).x, [
+    { n: "SQUAT/BELT_SQUAT", sets: [[5, 60, 10]] },
+    { n: "SQUAT/BELT_SQUAT", p: 1, sets: [[5, 120, 100]] },
+    { n: "SQUAT/BELT_SQUAT", p: 2, sets: [[6, 140, 200], [6, 140, 300]], note: "deep" },
+    { n: "PULL_UP/PULL_UP", p: 3, sets: [[8, null, 400]] },
+  ]);
+});
+
+test("Replace on a card of two lines renames every row and drops both written loads", () => {
+  let state = tickSet(logic.startClock(logic.newState(THURSDAY), START), 0, 0, 30);
+  state = logic.swapExercise(state, 0, "SQUAT/LEG_PRESS");
+  assert.equal(state.x[0].n, "SQUAT/LEG_PRESS");
+  assert.equal(logic.prescriptionLine(state.x[0]), "1×5, 3×4–6");
+  assert.deepEqual(state.x[0].sets.map((set) => [set.kg, set.p, set.w]),
+                   [[120, 1, true], [140, 2, false], [140, 2, false], [140, 2, false]]);
+  assert.deepEqual(logic.buildLog(state, END).x,
+                   [{ n: "SQUAT/LEG_PRESS", p: 1, sets: [[5, 120, 30]] }]);
 });
 
 test("Dup adds the card's exercise right after it, its sets as they stand, none ticked", () => {
   let state = exampleState();
   state = logic.setKg(state, 0, 0, 100);
   state = tickSet(state, 0, 0, 30);
-  state = logic.toggleWarmup(state, 0);
+  state = logic.toggleWarmup(state, 0, 0);
   state = logic.duplicateExercise(state, 0);
   assert.deepEqual(state.x.map((x) => x.n),
                    ["SQUAT/BELT_SQUAT", "SQUAT/BELT_SQUAT", "PULL_UP/PULL_UP"]);
   const copy = state.x[1];
   assert.equal(copy.id, 3);
-  assert.equal(copy.p, null);
-  assert.equal(copy.warmup, true);
-  assert.deepEqual(copy.sets.map((set) => [set.reps, set.kg, set.done]),
-                   [[6, 100, false], [6, 140, false], [6, 140, false]]);
+  assert.deepEqual(copy.lines, []);
+  assert.deepEqual(copy.sets.map((set) => [set.reps, set.kg, set.done, set.p, set.w]),
+                   [[6, 100, false, null, true], [6, 140, false, null, false],
+                    [6, 140, false, null, false]]);
 });
 
 test("a timer reset brings Start back, and the ticked sets are measured from the new start", () => {
@@ -571,7 +685,7 @@ test("an opened log draws its cards in its order: done sets, then written ones n
                    ["[Curl] Barbell curl", "[Squat] Leg press", "Pull up"]);
   // The added exercise stands for no written line.
   assert.equal(logic.prescriptionLine(state.x[0]), "added");
-  assert.deepEqual(state.x[0].sets, [{ reps: 10, kg: 30, done: true, t: 60 }]);
+  assert.deepEqual(state.x[0].sets, [{ reps: 10, kg: 30, done: true, t: 60, p: null, w: false }]);
   // The swap keeps the squat's line without its load, its two done sets and the third unticked.
   assert.equal(logic.prescriptionLine(state.x[1]), "3×4–6");
   assert.equal(state.x[1].note, "rack busy");
@@ -644,6 +758,52 @@ test("an opened log that ran over midnight started the day before", () => {
   assert.deepEqual([log.d, log.st, log.en], ["2026-09-24", "23:40", "00:25"]);
 });
 
+test("an opened log the new page sent gives back the cards the athlete sent it from", () => {
+  let state = logic.startClock(logic.newState(THURSDAY), START);
+  // An added card's sets left unticked are not in the log, so this one keeps one set.
+  state = logic.addExercise(state, "CURL/BARBELL_CURL", false);
+  state = logic.removeSet(logic.removeSet(state, 3), 3);
+  for (const [xi, si, seconds] of [[0, 0, 30], [0, 1, 200], [0, 2, 400], [1, 0, 600],
+                                   [2, 0, 800], [3, 0, 900]]) {
+    state = tickSet(state, xi, si, seconds);
+  }
+  state = logic.setExerciseNote(state, 0, "deep");
+  state = logic.markFinished(state, END);
+  const log = logic.buildLog(state, END);
+  const opened = logic.stateFromLog(THURSDAY, log);
+  assert.deepEqual(opened.x, state.x);
+  assert.equal(logic.finish(opened, END).text, logic.logText(log));
+});
+
+test("an opened log from the old page, its warm-up cards apart, opens and sends the same", () => {
+  // The old page drew one card per row. The athlete did the belt squat warm-up, then the
+  // pull-ups, then the main belt squat sets; and a lighter leg press of their own before the
+  // written one.
+  const old = { v: 2, r: 1, d: "2026-09-24", st: "18:02", en: "19:05", x: [
+    { n: "SQUAT/BELT_SQUAT", p: 1, sets: [[5, 120, 60]], note: "easy" },
+    { n: "PULL_UP/PULL_UP", p: 3, sets: [[8, null, 200]] },
+    { n: "SQUAT/BELT_SQUAT", p: 2, sets: [[6, 140, 400]] },
+    { n: "SQUAT/LEG_PRESS", sets: [[10, 150, 600]], note: "light" },
+    { n: "SQUAT/LEG_PRESS", p: 4, sets: [[10, 200, 800]], note: "seat 5" },
+  ] };
+  const state = logic.stateFromLog(THURSDAY, old);
+  assert.deepEqual(state.x.map((x) => x.n), ["SQUAT/BELT_SQUAT", "PULL_UP/PULL_UP",
+    "SQUAT/BELT_SQUAT", "SQUAT/LEG_PRESS"]);
+  assert.deepEqual(positions(state), [[1], [3], [2], [4]]);
+  // The lighter leg press stood for no line, and is a warm-up by its load.
+  assert.deepEqual(state.x[3].sets.map((set) => [set.kg, set.p, set.w, set.done]),
+                   [[150, null, true, true], [200, 4, false, true], [200, 4, false, false],
+                    [200, 4, false, false]]);
+  assert.equal(state.x[3].note, "light; seat 5");
+  assert.deepEqual(state.x[0].sets.map((set) => set.w), [true]);
+  const sent = logic.buildLog(state, END).x;
+  assert.deepEqual(sent.slice(0, 3), old.x.slice(0, 3));
+  assert.deepEqual(sent.slice(3), [
+    { n: "SQUAT/LEG_PRESS", sets: [[10, 150, 600]] },
+    { n: "SQUAT/LEG_PRESS", p: 4, sets: [[10, 200, 800]], note: "light; seat 5" },
+  ]);
+});
+
 test("the calendar's address carries the session and the log, and a gym address no log", () => {
   const session = logic.sessionFromHash(EXAMPLE_HASH);
   const address = logic.loggedAddress({ s: session, l: SENT_LOG });
@@ -709,7 +869,6 @@ test("an edited chain keeps its sets, ticked or not, and loses its written load"
   const after = logic.swapExercise(state, 0, key);
   assert.equal(after.x[0].n, "SQUAT/BELT_SQUAT>SQUAT/LEG_PRESS");
   assert.deepEqual(after.x[0].sets, state.x[0].sets);
-  assert.equal(after.x[0].p, 1);
-  assert.equal(after.x[0].kg, null);
+  assert.deepEqual(after.x[0].lines, [{ p: 1, s: 3, lo: 4, hi: 6, kg: null }]);
   assert.equal(logic.buildLog(after, END).x[0].n, key);
 });

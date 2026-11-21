@@ -247,7 +247,7 @@ the catalog lacks, a chain's included, so the card's Replace on a chain card sea
 exercise with no pattern filter and needs no change. The card's Replace, Del and Dup act on the
 whole card, as today.
 
-**Building and changing a chain.** Nothing is added to the card's eight buttons and nothing to the
+**Building and changing a chain.** Nothing is added to the card's buttons and nothing to the
 footer (D21). A tap on a chip opens a rounded box around that movement holding three buttons,
 Replace, Remove and Chain with, so it is plain which movement they act on; a second tap on the
 chip closes the box. Replace and Chain with open the search sheet titled after the chip as it
