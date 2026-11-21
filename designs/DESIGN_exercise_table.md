@@ -293,6 +293,8 @@ The main muscles, then a `|`, then the secondary ones, in Garmin's words: `ABDUC
 Connect's catalog, which gives them for 1,496 of its 1,531 exercises. A class takes the muscles of
 its key, or of its first name that has any. A FIT-only name has none and the column stays empty.
 Two of the catalog's lists repeat a muscle, and the table writes it once.
+`CORE/ARM_AND_LEG_EXTENSION_ON_KNEES`, the bird dog, has none in the catalog; `ABS,LOWER_BACK`
+were set by hand on 2026-11-21, so it shows the core icon (§3.9).
 
 Muscles tell apart what `accessory` lumps together. A dumbbell fly, a cable crossover and the pec
 deck all have `CHEST`, and a curl has `BICEPS`. They do not replace the pattern: a pull-up and a

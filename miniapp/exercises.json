@@ -517,7 +517,7 @@
 {"k":"CORE/U_BOAT","w":"core: u boat","p":"core_carry","g":"Nothing","b":true,"r":"🪵"},
 {"k":"CORE/WINDMILL_SWITCHES","w":"core: windmill switches","p":"core_carry","g":"Nothing","b":true,"r":"🪵","o":true},
 {"k":"CORE/ABDOMINAL_LEG_ROTATIONS","w":"core: abdominal leg rotations","p":"core_carry","g":"Nothing","b":true,"r":"🪵"},
-{"k":"CORE/ARM_AND_LEG_EXTENSION_ON_KNEES","w":"core: arm and leg extension on knees","p":"accessory","g":"Nothing","b":true,"o":true},
+{"k":"CORE/ARM_AND_LEG_EXTENSION_ON_KNEES","w":"core: arm and leg extension on knees","p":"accessory","g":"Nothing","b":true,"r":"🪵","o":true},
 {"k":"CORE/BICYCLE","w":"core: bicycle","p":"core_carry","g":"Nothing","b":true,"r":"🪵","f":"Air_Bike","o":true},
 {"k":"CORE/BICEP_CURL_WITH_LEG_EXTENSION","w":"core: bicep curl with leg extension","p":"accessory","g":"Nothing","b":true},
 {"k":"CORE/CAT_COW","w":"core: cat cow","p":"accessory","g":"Nothing","b":true},
