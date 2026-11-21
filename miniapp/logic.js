@@ -441,7 +441,7 @@ export function moveExercise(state, xi, delta) {
   return after;
 }
 
-// The Order sheet's one move: the cards at `a` and `b` trade places (§1).
+// The Order sheet's "Trade places": the cards at `a` and `b` trade places (§1).
 export function swapExercises(state, a, b) {
   const last = state.x.length - 1;
   if (a === b || a < 0 || b < 0 || a > last || b > last) {
@@ -449,6 +449,23 @@ export function swapExercises(state, a, b) {
   }
   const after = next(state);
   [after.x[a], after.x[b]] = [after.x[b], after.x[a]];
+  return after;
+}
+
+// The Order sheet's other move: the card at `from` goes right above the card at `before`, or
+// to the end when `before` is the number of cards (§1).
+export function moveExerciseAbove(state, from, before) {
+  const count = state.x.length;
+  if (from < 0 || from >= count || before < 0 || before > count) {
+    return state;
+  }
+  if (before === from || before === from + 1) {
+    // It is already right above that card.
+    return state;
+  }
+  const after = next(state);
+  const [moved] = after.x.splice(from, 1);
+  after.x.splice(before > from ? before - 1 : before, 0, moved);
   return after;
 }
 

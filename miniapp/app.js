@@ -31,6 +31,10 @@ const ui = {
   orderSheet: document.getElementById("order-sheet"),
   orderRows: document.getElementById("order-rows"),
   orderClose: document.getElementById("order-close"),
+  orderTrade: document.getElementById("order-trade"),
+  orderMove: document.getElementById("order-move"),
+  orderHint: document.getElementById("order-hint"),
+  orderEnd: document.getElementById("order-end"),
   resetClock: document.getElementById("reset-clock"),
   resumeClock: document.getElementById("resume-clock"),
   cards: document.getElementById("cards"),
@@ -92,8 +96,10 @@ let searchPart = null;
 let replacePattern = null;
 // The chip whose three buttons show, `{ card, part }`, or null. Not saved.
 let openChip = null;
-// In the Order sheet: the id of the card waiting for its partner, or null, and the ids of the
-// two cards that last traded places. Not saved.
+// In the Order sheet: whether two taps move the first card above the second ("Move above") or
+// make the two trade places, the id of the card waiting for its second tap, or null, and the
+// ids of the cards the last tap moved. Not saved.
+let orderMoves = false;
 let orderPicked = null;
 let orderSwapped = [];
 
@@ -549,14 +555,21 @@ function tick() {
 
 // ---------------------------------------------------------------------------------------
 // The Order sheet: one line per card, so the whole session is in reach without scrolling. A
-// tap picks a line, a tap on another makes the two trade places, one Undo step each (§1).
+// tap picks a line, and a tap on another makes the two trade places or, under "Move above",
+// puts the first above the second; one Undo step each (§1).
 // ---------------------------------------------------------------------------------------
 
+// The sheet always opens on "Trade places".
 function showOrder(shown) {
-  orderPicked = null;
-  orderSwapped = [];
   ui.orderSheet.hidden = !shown;
   syncMainButton();
+  setOrderMode(false);
+}
+
+function setOrderMode(moves) {
+  orderMoves = moves;
+  orderPicked = null;
+  orderSwapped = [];
   renderOrder();
 }
 
@@ -564,6 +577,12 @@ function renderOrder() {
   if (ui.orderSheet.hidden) {
     return;
   }
+  ui.orderTrade.setAttribute("aria-pressed", String(!orderMoves));
+  ui.orderMove.setAttribute("aria-pressed", String(orderMoves));
+  ui.orderHint.textContent = orderMoves
+    ? "Tap an exercise, then the line it goes above."
+    : "Tap two exercises: they trade places.";
+  ui.orderEnd.hidden = !orderMoves || orderPicked === null;
   ui.orderRows.replaceChildren(...state.x.map(orderRow));
 }
 
@@ -595,9 +614,27 @@ function onOrderTap(xi) {
     renderOrder();
     return;
   }
+  if (orderMoves) {
+    placePicked(from, xi);
+    return;
+  }
   orderSwapped = [orderPicked, id];
   orderPicked = null;
   apply(logic.swapExercises(state, from, xi));
+}
+
+// "Move above": the picked card goes right above the card at `before`, or to the end.
+function placePicked(from, before) {
+  orderSwapped = [orderPicked];
+  orderPicked = null;
+  apply(logic.moveExerciseAbove(state, from, before));
+}
+
+function onOrderEnd() {
+  const from = state.x.findIndex((exercise) => exercise.id === orderPicked);
+  if (from >= 0) {
+    placePicked(from, state.x.length);
+  }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -878,6 +915,9 @@ function wire() {
   });
   ui.order.addEventListener("click", () => showOrder(true));
   ui.orderClose.addEventListener("click", () => showOrder(false));
+  ui.orderTrade.addEventListener("click", () => setOrderMode(false));
+  ui.orderMove.addEventListener("click", () => setOrderMode(true));
+  ui.orderEnd.addEventListener("click", onOrderEnd);
   ui.searchInput.addEventListener("input", renderResults);
   ui.searchAll.addEventListener("change", renderResults);
   ui.searchClose.addEventListener("click", closeSearch);

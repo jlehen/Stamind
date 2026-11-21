@@ -224,6 +224,26 @@ test("swapping two exercises makes them trade places and leaves the positions al
   assert.deepEqual(logic.swapExercises(state, 0, 3), state);
 });
 
+test("moving an exercise above another puts it right there, or at the end", () => {
+  let state = exampleState();
+  state = logic.addExercise(state, "ROW/SEATED_CABLE_ROW", false);
+  const names = (s) => s.x.map((x) => x.n.split("/")[1]);
+  assert.deepEqual(names(state), ["BELT_SQUAT", "PULL_UP", "SEATED_CABLE_ROW"]);
+  // Up: the row goes above the squat. Down: the squat goes above the row's old neighbour.
+  assert.deepEqual(names(logic.moveExerciseAbove(state, 2, 0)),
+                   ["SEATED_CABLE_ROW", "BELT_SQUAT", "PULL_UP"]);
+  assert.deepEqual(names(logic.moveExerciseAbove(state, 0, 2)),
+                   ["PULL_UP", "BELT_SQUAT", "SEATED_CABLE_ROW"]);
+  // The number of cards as the place means the end.
+  assert.deepEqual(names(logic.moveExerciseAbove(state, 0, 3)),
+                   ["PULL_UP", "SEATED_CABLE_ROW", "BELT_SQUAT"]);
+  // Above itself, above the card it already sits above, or a place that is not there.
+  assert.deepEqual(logic.moveExerciseAbove(state, 1, 1), state);
+  assert.deepEqual(logic.moveExerciseAbove(state, 1, 2), state);
+  assert.deepEqual(logic.moveExerciseAbove(state, 2, 3), state);
+  assert.deepEqual(logic.moveExerciseAbove(state, 0, 4), state);
+});
+
 test("removing an exercise drops it, removing a set stops at the last one", () => {
   let state = exampleState();
   state = logic.removeExercise(state, 0);

@@ -127,6 +127,44 @@ test("the Order sheet makes two tapped exercises trade places", async (t) => {
   });
 });
 
+test("the Order sheet's Move above puts the first tapped exercise above the second", async (t) => {
+  await onPhone(t, async (page, site) => {
+    await page.goto(`${site}/`, { waitUntil: "networkidle" });
+    await page.waitForSelector(".card");
+    const names = () => page.locator(".card .chip").allTextContents();
+    const before = await names();
+    const rows = page.locator("#order-rows .order-row");
+
+    // The end line shows only under Move above, once a line is picked.
+    await page.locator("#order").click();
+    await rows.nth(0).click();
+    assert.equal(await page.locator("#order-end").isVisible(), false);
+    await page.locator("#order-move").click();
+    assert.equal(await page.locator("#order-rows .picked").count(), 0);
+    assert.match(await page.locator("#order-hint").textContent(), /goes above/);
+
+    // The fourth exercise goes above the first; the others keep their order.
+    await rows.nth(3).click();
+    assert.equal(await page.locator("#order-end").isVisible(), true);
+    await rows.nth(0).click();
+    assert.deepEqual((await names()).slice(0, 4), [before[3], before[0], before[1], before[2]]);
+    assert.equal(await page.locator("#order-rows .swapped").count(), 1);
+
+    // The first line goes to the end, and one Undo step takes that back.
+    await rows.nth(0).click();
+    await page.locator("#order-end").click();
+    const moved = await names();
+    assert.equal(moved[moved.length - 1], before[3]);
+
+    // A reopened sheet is back on Trade places.
+    await page.locator("#order-close").click();
+    await page.locator("#undo").click();
+    assert.deepEqual((await names()).slice(0, 4), [before[3], before[0], before[1], before[2]]);
+    await page.locator("#order").click();
+    assert.equal(await page.locator("#order-trade").getAttribute("aria-pressed"), "true");
+  });
+});
+
 // The demo session writes the belt squat as 1×5 @ 120, then 3×4–6 @ 140: one card (§1).
 test("a warm-up and its main sets are one card, each row's mark a warm-up switch", async (t) => {
   await onPhone(t, async (page, site) => {

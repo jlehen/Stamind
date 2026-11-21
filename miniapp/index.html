@@ -72,15 +72,21 @@
   </div>
 </div>
 
-<!-- The whole session as one line per card: two taps make two cards trade places (§1). -->
+<!-- The whole session as one line per card: two taps make two cards trade places, or put
+     the first above the second (§1). -->
 <div class="sheet" id="order-sheet" hidden>
   <div class="sheet-box">
     <div class="sheet-head">
       <h2>Order</h2>
       <button class="close" id="order-close" type="button">✕</button>
     </div>
-    <p class="sheet-note">Tap two exercises: they trade places.</p>
+    <div class="order-modes" role="group" aria-label="What two taps do">
+      <button class="order-mode" id="order-trade" type="button">Trade places</button>
+      <button class="order-mode" id="order-move" type="button">Move above</button>
+    </div>
+    <p class="sheet-note" id="order-hint"></p>
     <div class="results" id="order-rows"></div>
+    <button class="order-end" id="order-end" type="button" hidden>⤓ Put it at the end</button>
   </div>
 </div>
 

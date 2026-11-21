@@ -69,8 +69,16 @@ on another line makes the two cards trade places; a second tap on the picked lin
 Each trade is one Undo step. Here is an example. It is Monday, and the session pairs the hip
 thrust with the shoulder press and the lunge with the row. The shoulder press bench is taken.
 The athlete opens Order and taps the shoulder press, then the row: two taps, warm-ups
-included, and the hip thrust now goes with the row and the lunge with the shoulder press. Not
-handled: moving a group past a group of another size in one go, which stays a card at a time.
+included, and the hip thrust now goes with the row and the lunge with the shoulder press.
+
+Two buttons at the top of the sheet say what the two taps do: "Trade places", which the sheet
+opens on, and "Move above". Under "Move above" the first tapped card goes right above the
+second, and the cards between keep their order; a line "Put it at the end" shows under the
+list while a card is picked. A trade cannot do this. The same Monday, the athlete does the
+Romanian deadlift, the lateral raise and the flye before the hip thrust, because the hip
+thrust machine is taken. They tap "Move above", then each of the three and the hip thrust:
+six taps. Trading would scatter the four cards the three jumped over. A move is one card at
+a time: not handled, picking several cards to move together.
 
 The clock does not run when the page opens. At 17:50, in the changing room, the athlete
 sees the leg press is out of order and swaps it before walking in. The header shows a
