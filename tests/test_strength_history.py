@@ -374,8 +374,8 @@ class PrescribedSetsTest(_HistoryCase):
             "[Full-Body Strength]",
             "Heavy full-body.",
             "",
-            "Squat: belt squat 1×5 @ 120, 3×4–6 @ 140 kg",
-            "Pull up: chin up 3×3–5",
+            "🦵 Squat: belt squat 1×5 @ 120, 3×4–6 @ 140 kg",
+            "💪 Pull up: chin up 3×3–5",
             "2–3 min rests.",
         ]))
         self.assertEqual(len(workout["prescribed_sets"]), 3)

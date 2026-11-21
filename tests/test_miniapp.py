@@ -48,8 +48,9 @@ class ExerciseCatalogTest(unittest.TestCase):
         self.assertTrue(rows)
         for row in rows:
             self.assertLessEqual({"k", "w", "p", "g", "b"}, set(row))
-            self.assertLessEqual(set(row), {"k", "w", "p", "g", "b", "f", "o", "a", "t"})
+            self.assertLessEqual(set(row), {"k", "w", "p", "g", "b", "r", "f", "o", "a", "t"})
             known = vocabulary.get(row["k"])
+            self.assertEqual(row.get("r", ""), vocabulary.region_mark(row["k"]))
             self.assertEqual(row.get("a", ""), ", ".join(known.also_words))
             self.assertEqual(row.get("t", row["w"]), vocabulary.respelled(row["w"]))
             self.assertIs(row.get("o", False), known.per_side)

@@ -474,6 +474,7 @@ function splitPill(word, className, [lessLabel, onLess], [moreLabel, onMore]) {
 // the three buttons that act on that movement (DESIGN_strength_combos.md §6).
 function cardTitle(exercise, xi) {
   const chips = logic.chipsOf(catalog, exercise.n);
+  const parts = logic.partsOf(exercise.n);
   const title = el("div", "card-title");
   if (chips.length > 1) {
     title.append(el("span", "chain-mark", "⛓"));
@@ -482,7 +483,9 @@ function cardTitle(exercise, xi) {
     if (part) {
       title.append(el("span", "chain-arrow", "→"));
     }
-    title.append(movement(exercise, xi, chip, part, chips.length));
+    // The region's icon rides in the pill, so a long name never wraps away from it.
+    const label = `${logic.marksOf(catalog, parts[part])} ${chip}`.trim();
+    title.append(movement(exercise, xi, label, part, chips.length));
   });
   return title;
 }
@@ -675,7 +678,8 @@ function orderRow(exercise, xi) {
     row.classList.add("swapped");
   }
   row.setAttribute("aria-pressed", String(exercise.id === orderPicked));
-  row.append(el("span", "order-name", logic.wordsOf(catalog, exercise.n)));
+  const marks = logic.marksOf(catalog, exercise.n);
+  row.append(el("span", "order-name", `${marks} ${logic.wordsOf(catalog, exercise.n)}`.trim()));
   // The card's heaviest load, so a warm-up row does not stand for the card.
   const loads = exercise.sets.map((set) => set.kg).filter((kg) => kg !== null);
   const load = loads.length ? `${logic.formatKg(Math.max(...loads))} kg` : logic.formatKg(null);

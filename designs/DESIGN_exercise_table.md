@@ -374,6 +374,28 @@ picks the one-sided class, and where Garmin had none for a common form, one was 
 No list Stamind reads carries this fact, so the column was filled by reading every name of the
 table twice, once by a person's rule and once blind, and settling where the two differed.
 
+### 3.9 Region
+
+An icon before an exercise's name says which part of the body it works: 💪 upper, 🦵 lower,
+🪵 core. It lets the athlete see at a glance which two exercises pair into a superset: a
+squat and a row, say, rather than two presses. It is not a column. It is read off the pattern,
+else off the main muscles:
+
+- `squat`, `hinge` and `single_leg` are lower; the four push and pull patterns are upper;
+  `core_carry` is core.
+- `accessory` and the lines with no pattern take the region of their main muscles (§3.5), when
+  they all fall in one: a curl is upper, a calf raise lower, squat jacks lower. Core is `ABS`,
+  `OBLIQUES` and `LOWER_BACK`; the hips, glutes and legs are lower.
+- Main muscles in two regions (a bridge with a leg extension), or none listed (arm circles):
+  no icon.
+
+The icon comes first on an exercise line of a session's description and on the gym logger's
+Order row; there a chain shows each region once, in the order of its movements: 🦵💪 for a
+squat then a press. On the gym logger's card, it sits inside each movement's name pill, so a
+long name never wraps away from it. The strength planner reads keys and never sees it.
+
+Not handled: push against pull. A bench press and a row both read 💪.
+
 ## 4. What is stored, and what is shown
 
 **Stored: the key.** Everywhere the database holds an exercise today, it holds the key of the

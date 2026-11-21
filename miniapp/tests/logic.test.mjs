@@ -102,6 +102,15 @@ test("an exercise done one side at a time says so after its reps", () => {
   assert.equal(logic.prescriptionLine(card, false), "3×8–10 @ 30 kg");
 });
 
+test("a card is marked with the body regions its movements work, each once", () => {
+  // `r` is the catalog's mark (DESIGN_exercise_table.md §3.9).
+  const catalog = [{ k: "A", r: "🦵" }, { k: "B", r: "💪" }, { k: "C" }, { k: "D", r: "🦵" }];
+  assert.equal(logic.marksOf(catalog, "A"), "🦵");
+  assert.equal(logic.marksOf(catalog, "C"), "");
+  assert.equal(logic.marksOf(catalog, "MISSING"), "");
+  assert.equal(logic.marksOf(catalog, "A>C>B>D"), "🦵💪");
+});
+
 test("the log holds the done sets only, and the day comes from the phone's clock", () => {
   let state = exampleState();
   state = tickSet(state, 0, 0, 40);

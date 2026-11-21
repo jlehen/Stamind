@@ -132,7 +132,7 @@ class WhenItRunsTest(_PlannerCase):
         result = self.strength_pass([])
         self.assertEqual(len(result.added), 1)
         self.assertEqual(result.added[0]["description"], "\n".join([
-            "[Gym]", "", "Squat: belt squat 3×4–6 @ 140 kg", "2–3 min rests.",
+            "[Gym]", "", "🦵 Squat: belt squat 3×4–6 @ 140 kg", "2–3 min rests.",
         ]))
         self.assertNotIn("8RM", result.added[0]["description"])
 

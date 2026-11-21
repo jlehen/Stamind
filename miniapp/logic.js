@@ -839,6 +839,13 @@ export function patternOf(catalog, key) {
   return row ? row.p : null;
 }
 
+// The marks of the body regions a key's movements work, each once: "🦵💪" for a squat chained
+// to a press, "" when none has one (DESIGN_exercise_table.md §3.9).
+export function marksOf(catalog, key) {
+  const marks = partsOf(key).map((part) => rowOf(catalog, part)?.r).filter(Boolean);
+  return [...new Set(marks)].join("");
+}
+
 // Whether a key is done one side at a time: its reps are per side and a set is both sides
 // (DESIGN_strength_tracking.md §4). A one-sided movement makes it so when it appears an odd
 // number of times: twice is once on each side inside a chain's round (DESIGN_strength_combos.md

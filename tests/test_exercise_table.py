@@ -130,6 +130,22 @@ class ChainTest(unittest.TestCase):
         self.assertEqual(vocabulary.side_mark(f"{clean}>SQUAT/GOBLET_SQUAT>{clean}"), "")
         self.assertEqual(vocabulary.side_mark(f"{clean}>{clean}>{clean}"), "/side")
 
+    def test_the_region_mark_comes_from_the_pattern_else_the_main_muscles(self):
+        """DESIGN_exercise_table.md §3.9: a chain gives each region once, in order."""
+        self.assertEqual(vocabulary.region_mark("SQUAT/GOBLET_SQUAT"), "🦵")
+        self.assertEqual(vocabulary.region_mark("PLANK/PLANK"), "🪵")
+        self.assertEqual(vocabulary.region_mark("CURL/BARBELL_BICEPS_CURL"), "💪")
+        self.assertEqual(vocabulary.region_mark("CARDIO/SQUAT_JACKS"), "🦵")
+        # Main muscles in two regions, none listed, or a key the table lacks: no mark.
+        self.assertEqual(vocabulary.region_mark("HIP_RAISE/BRIDGE_WITH_LEG_EXTENSION"), "")
+        self.assertEqual(vocabulary.region_mark("WARM_UP/ARM_CIRCLES"), "")
+        self.assertEqual(vocabulary.region_mark("SQUAT/MOON_SQUAT"), "")
+        self.assertEqual(vocabulary.region_mark(
+            "SQUAT/GOBLET_SQUAT>SHOULDER_PRESS/DUMBBELL_SHOULDER_PRESS>LUNGE/LUNGE"), "🦵💪")
+        line = prescription.exercise_lines(
+            [{"exercise": "PLANK/PLANK", "sets": 3, "reps_low": 1, "reps_high": 1}])
+        self.assertEqual(line, ["🪵 Plank 3×1"])
+
     def test_the_movements_share_one_implement(self):
         # Kettlebells and dumbbells read as one.
         self.assertTrue(vocabulary.shared_load(vocabulary.parts(CHAIN)))

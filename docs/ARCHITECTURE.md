@@ -2096,7 +2096,9 @@ its planned lines is DESIGN_strength_planned_vs_done.md.
 **Where the code is.** `miniapp/` is the page: static files, no build step, no server;
 `logic.js` is the pure logic under node tests in `miniapp/tests/`, `app.js` the DOM,
 `markdown.js` the export button, and `exercises.json` is built from the exercise table by
-`build_exercises.py` (`tests/test_miniapp.py` fails when the two disagree).
+`build_exercises.py` (`tests/test_miniapp.py` fails when the two disagree). The region icon
+before a name (DESIGN_exercise_table.md §3.9) is `vocabulary.region_mark`, shipped as the
+catalog's `r`, so the page and the description lines show the same one.
 `strength/logger.py` is the two payloads, pure and strict. `cli/strength_ingest.py` is
 `strength ingest`; `strength/sets.py::read_new_activities` runs the takeover
 (`db/strength.py::move_gym_log`) before any set is read from Garmin. The rows are

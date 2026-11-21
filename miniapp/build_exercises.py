@@ -21,15 +21,19 @@ OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exercises.j
 
 def rows():
     """Every class as the page reads it: its key, its words, its pattern, its gear, whether
-    it is bodyweight, the Free Exercise DB id of its photos when it has one, a mark when it is
-    done one side at a time, the names people use for it when it has some, and its words
-    respelled when they say "one arm" or "single arm", "one leg" or "single leg"."""
+    it is bodyweight, the mark of its body region when it has one (DESIGN_exercise_table.md
+    §3.9), the Free Exercise DB id of its photos when it has one, a mark when it is done one
+    side at a time, the names people use for it when it has some, and its words respelled
+    when they say "one arm" or "single arm", "one leg" or "single leg"."""
     listed = []
     for exercise in vocabulary.all_exercises():
         row = {
             "k": exercise.key, "w": exercise.words, "p": exercise.pattern,
             "g": ", ".join(exercise.gear), "b": exercise.bodyweight,
         }
+        mark = vocabulary.region_mark(exercise.key)
+        if mark:
+            row["r"] = mark
         if exercise.photos:
             row["f"] = exercise.photos
         if exercise.per_side:

@@ -56,6 +56,21 @@ SIDE_MARK = "/side"
 # reads between their words (DESIGN_strength_combos.md §3). No key of the table holds it.
 CHAIN_JOINER = ">"
 CHAIN_ARROW = " → "
+
+# The body region an exercise works, read off its pattern, else off its main muscles, and the
+# mark shown before its name so the pairs of a superset show (§3.9).
+PATTERN_REGIONS = {
+    "squat": "lower", "hinge": "lower", "single_leg": "lower", "push_horizontal": "upper",
+    "push_vertical": "upper", "pull_horizontal": "upper", "pull_vertical": "upper",
+    "core_carry": "core",
+}
+MUSCLE_REGIONS = {
+    "BICEPS": "upper", "CHEST": "upper", "FOREARM": "upper", "LATS": "upper",
+    "SHOULDERS": "upper", "TRAPS": "upper", "TRICEPS": "upper", "ABDUCTORS": "lower",
+    "ADDUCTORS": "lower", "CALVES": "lower", "GLUTES": "lower", "HAMSTRINGS": "lower",
+    "HIPS": "lower", "QUADS": "lower", "ABS": "core", "LOWER_BACK": "core", "OBLIQUES": "core",
+}
+REGION_MARKS = {"upper": "💪", "lower": "🦵", "core": "🪵"}
 # A chain's movements share one implement, and a kettlebell does what a dumbbell does
 # (DESIGN_strength_combos.md §4).
 SAME_LOAD = {"Kettlebells": "Dumbbells"}
@@ -93,6 +108,15 @@ class Exercise:
     @property
     def words(self) -> str:
         return words(self.key)
+
+    @property
+    def region(self) -> str:
+        """'upper', 'lower' or 'core'; "" when its main muscles span two regions or none is
+        listed (§3.9)."""
+        if self.pattern in PATTERN_REGIONS:
+            return PATTERN_REGIONS[self.pattern]
+        regions = {MUSCLE_REGIONS[muscle] for muscle in self.muscles}
+        return regions.pop() if len(regions) == 1 else ""
 
     @property
     def also_words(self) -> Tuple[str, ...]:
@@ -272,6 +296,18 @@ def side_mark(key: Optional[str]) -> str:
     if not any(count % 2 and _one_sided(part) for part, count in counts.items()):
         return ""
     return SIDE_MARK
+
+
+def region_mark(key: str) -> str:
+    """The marks of a key's movements, each once, in the order they are done: '🦵💪' for a
+    squat chained to a press; "" when none has a region (§3.9)."""
+    marks: List[str] = []
+    for part in parts(key):
+        known = get(part)
+        mark = REGION_MARKS.get(known.region) if known else None
+        if mark and mark not in marks:
+            marks.append(mark)
+    return "".join(marks)
 
 
 def _one_sided(key: str) -> bool:
