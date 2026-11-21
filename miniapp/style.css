@@ -273,20 +273,57 @@ h1 {
   background: var(--line);
 }
 
+/* The buttons that act on the whole card, beside its name: ↑ ↓ over ⇆ ✕, and 📷 in a column of
+   its own when the exercise has photos (§1). */
 .moves {
   flex: none;
-  display: flex;
-  gap: 4px;
+  display: grid;
+  grid-template-areas: "up down" "replace del";
+  grid-auto-columns: 36px;
+  grid-auto-rows: 36px;
+  gap: 2px 4px;
+}
+
+.moves.with-photos {
+  grid-template-areas: "pic up down" ". replace del";
 }
 
 .move {
   width: 36px;
-  height: var(--tap);
+  height: 36px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--hint);
   font-size: 18px;
+}
+
+.move.up { grid-area: up; }
+.move.down { grid-area: down; }
+.move.replace { grid-area: replace; }
+.move.del { grid-area: del; }
+.move.pic { grid-area: pic; }
+
+.move.replace, .move.del, .move.pic {
+  color: var(--text);
+  font-size: 17px;
+}
+
+.move.pic {
+  font-size: 16px;
+}
+
+/* A ✕ tapped once, waiting for the second tap (§1). The light theme's red in both themes: the
+   dark theme's is a text colour, too pale under a white ✕. */
+.move.del.armed {
+  background: #c23b3b;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* The photos are open: the camera on the Start blue, which it reads on in both themes. */
+.move.pic[aria-pressed="true"] {
+  background: var(--start);
 }
 
 /* ----- one set ----- */
@@ -423,7 +460,7 @@ h1 {
   border-color: color-mix(in srgb, var(--warm) 70%, var(--bg));
 }
 
-/* ----- the buttons under an exercise, two rows of four on a phone ----- */
+/* ----- the buttons under an exercise, one row of four ----- */
 
 .tools {
   display: grid;

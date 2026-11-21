@@ -28,13 +28,21 @@ wins over a newer revision of its day. One nobody has started gives way to it, w
 
 Each card has an "Insert" button. It puts the new exercise right after that card, so a
 face pull added after the rows does not have to climb up from the bottom one tap at a time.
-The button that puts another exercise in a card's place is "⇆ Replace". Its search keeps the
-card's movement pattern as a filter, and says so beside the "Search every exercise" box
-that lifts it ("— only single leg"); Insert and Add search everything.
-The card's seven cells (↶, Set, W Set, Replace, Insert, Del, Pic) sit in two rows, four to a
-row, so their labels stay short. "Set" and "W Set" are split pills: a tap on the left half,
-"−", takes a row away, and a tap on the right half, "+", adds one. Each number box says what
-it holds, "reps" or "kg", under the number.
+The buttons that act on the whole exercise sit with its name, in a block of bare icons on the
+right: ↑ and ↓ on top, ⇆ (Replace) and ✕ (Delete) under them, and 📷 in a column of its own
+on the left of ↑ when the exercise has photos. ⇆ puts another exercise in the card's place.
+Its search keeps the card's movement pattern as a filter, and says so beside the "Search
+every exercise" box that lifts it ("— only single leg"); Insert and Add search everything.
+Under the sets, one row holds four cells: ↶, "Set", "W Set" and "⤵ Insert". "Set" and
+"W Set" are split pills: a tap on the left half, "−", takes a row away, and a tap on the
+right half, "+", adds one. Each number box says what it holds, "reps" or "kg", under the
+number.
+
+✕ takes two taps, because a mistaken tap must not delete a card. It is Tuesday, between two
+sets of bench press. The athlete reaches for ↓ and touches ✕ instead. The ✕ turns into a red
+box, and nothing is deleted. They tap the weight they meant to change, and the ✕ is back to
+normal; it also goes back by itself after 3 seconds, or when anything on the page changes. A
+second tap on the red box deletes the card, one step for the header's Undo.
 
 A warm-up and its main sets are one card. The strength planner writes a warm-up as a lighter
 row of the same exercise right before the main sets (`stamind/strength/progression.md`), so
@@ -157,11 +165,11 @@ supplies heart rate, duration and RPE; the log supplies the sets. Nothing is ask
   `miniapp/build_exercises.py`. What a row of it holds, and the commit mark it is fetched
   with, are in DESIGN_exercise_table.md §8.
 - Photos. It is Thursday and the strength planner has written a Romanian deadlift the
-  athlete has not done before. Its card has a "📷 Pic" button, and a tap shows two photos of
-  the lift under its name. They come from Free Exercise DB, a public-domain set of about 870
-  exercises with two photos each, loaded from its GitHub repository; nothing is copied into
-  this one. The exercise table's fifth column holds the entry's id (DESIGN_exercise_table.md
-  §3.7). A row gets one only when the
+  athlete has not done before. Its card has a 📷 beside the name, and a tap shows two photos
+  of the lift under it; the 📷 looks pressed until a second tap hides them. They come from
+  Free Exercise DB, a public-domain set of about 870 exercises with two photos each, loaded
+  from its GitHub repository; nothing is copied into this one. The exercise table's fifth
+  column holds the entry's id (DESIGN_exercise_table.md §3.7). A row gets one only when the
   entry is the same exercise, so a belt squat, which the set lacks, has no button rather than
   a photo of another squat. The links came from a Gemini Flash and Sonnet comparison of the
   two lists, kept for the main movement patterns and checked by hand; an exercise without

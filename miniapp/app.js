@@ -96,6 +96,11 @@ let searchPart = null;
 let replacePattern = null;
 // The chip whose three buttons show, `{ card, part }`, or null. Not saved.
 let openChip = null;
+// The id of the card whose ✕ waits for its second tap, or null, and the timer that lets it go
+// (§1). Not saved.
+let armed = null;
+let armedTimer = 0;
+const ARMED_MS = 3000;
 // In the Order sheet: whether two taps move the first card above the second ("Move above") or
 // make the two trade places, the id of the card waiting for its second tap, or null, and the
 // ids of the cards the last tap moved. Not saved.
@@ -178,7 +183,8 @@ function persist() {
 // Applying a change. `apply` redraws, `applyQuiet` does not, because a redraw triggered by a
 // field losing focus would replace the button the tap was heading for. Both record the change
 // for Undo, under the card it was made on (`card`, its id) or under the page (null). Both, and
-// an undo, close the open chip box: its place in the card may now hold another movement.
+// an undo, close the open chip box: its place in the card may now hold another movement. Every
+// change lets an armed ✕ go.
 // ---------------------------------------------------------------------------------------
 
 function remember(after, card) {
@@ -187,6 +193,7 @@ function remember(after, card) {
   }
   state = after;
   openChip = null;
+  disarm();
   persist();
 }
 
@@ -204,6 +211,7 @@ function applyQuiet(after, card = null) {
 // history.
 function applyUnrecorded(after) {
   state = after;
+  disarm();
   persist();
   render();
 }
@@ -215,6 +223,7 @@ function undo(result) {
   state = result.state;
   history = result.history;
   openChip = null;
+  disarm();
   persist();
   render();
 }
@@ -314,13 +323,10 @@ function exerciseCard(exercise, xi) {
   name.append(el("div", "card-pres",
     logic.prescriptionLine(exercise, logic.perSideOf(catalog, exercise.n))));
   head.append(name);
-  const moves = el("div", "moves");
-  moves.append(button("↑", "move", () => apply(logic.moveExercise(state, xi, -1))));
-  moves.append(button("↓", "move", () => apply(logic.moveExercise(state, xi, 1))));
-  head.append(moves);
+  const photos = logic.photosOf(catalog, exercise.n);
+  head.append(cardMoves(exercise, xi, words, photos.length > 0));
   card.append(head);
 
-  const photos = logic.photosOf(catalog, exercise.n);
   if (photosOpen.has(exercise.n)) {
     const strip = el("div", "photos");
     for (const address of photos) {
@@ -348,13 +354,7 @@ function exerciseCard(exercise, xi) {
   undoCard.setAttribute("aria-label", `Undo the last change to ${words}`);
   tools.append(undoCard);
   tools.append(...setButtons(xi, id));
-  tools.append(button("⇆ Replace", "pill", () => openSearch("swap", xi)));
   tools.append(button("⤵ Insert", "pill", () => openSearch("insert", xi)));
-  tools.append(button("✕ Del", "pill danger", () => apply(logic.removeExercise(state, xi))));
-  if (photos.length) {
-    const label = photosOpen.has(exercise.n) ? "📷 Hide" : "📷 Pic";
-    tools.append(button(label, "pill", () => togglePhotos(exercise.n)));
-  }
   card.append(tools);
 
   const note = el("input", "note");
@@ -365,6 +365,86 @@ function exerciseCard(exercise, xi) {
     () => applyQuiet(logic.setExerciseNote(state, xi, note.value), id));
   card.append(note);
   return card;
+}
+
+// The buttons that act on the whole card, beside its name: ↑ ↓ over ⇆ ✕, and 📷 in a column of
+// its own when the exercise has photos (§1). Their places are `.moves` grid areas (style.css).
+function cardMoves(exercise, xi, words, hasPhotos) {
+  const moves = el("div", "moves");
+  if (hasPhotos) {
+    moves.classList.add("with-photos");
+    const shown = photosOpen.has(exercise.n);
+    const verb = shown ? "Hide" : "Show";
+    const pic = iconButton("📷", "pic", `${verb} the photos of ${words}`,
+                           () => togglePhotos(exercise.n));
+    pic.setAttribute("aria-pressed", String(shown));
+    moves.append(pic);
+  }
+  moves.append(
+    iconButton("↑", "up", `Move ${words} up`, () => apply(logic.moveExercise(state, xi, -1))),
+    iconButton("↓", "down", `Move ${words} down`,
+               () => apply(logic.moveExercise(state, xi, 1))),
+    iconButton("⇆", "replace", `Replace ${words}`, () => openSearch("swap", xi)),
+    delButton(xi, exercise.id, words),
+  );
+  return moves;
+}
+
+function iconButton(icon, kind, label, onClick) {
+  const node = button(icon, `move ${kind}`, onClick);
+  node.setAttribute("aria-label", label);
+  return node;
+}
+
+// ✕ takes two taps: the first arms it, the second deletes the card, one step for the header's
+// Undo (§1).
+function delButton(xi, id, words) {
+  const del = button("✕", "move del", () => {
+    if (armed !== id) {
+      arm(id, del);
+      return;
+    }
+    apply(logic.removeExercise(state, xi));
+  });
+  del.dataset.words = words;
+  drawDel(del, armed === id);
+  return del;
+}
+
+// Arming and letting go change the button in place: a redraw would replace the number field the
+// athlete may be typing in.
+function arm(id, del) {
+  disarm();
+  armed = id;
+  drawDel(del, true);
+  armedTimer = window.setTimeout(disarm, ARMED_MS);
+}
+
+function disarm() {
+  window.clearTimeout(armedTimer);
+  if (armed === null) {
+    return;
+  }
+  armed = null;
+  const del = ui.cards.querySelector(".del.armed");
+  if (del) {
+    drawDel(del, false);
+  }
+}
+
+function drawDel(del, on) {
+  del.classList.toggle("armed", on);
+  const label = on ? "Tap again to delete" : "Delete";
+  del.setAttribute("aria-label", `${label} ${del.dataset.words}`);
+}
+
+// A touch anywhere but on the armed ✕ lets it go. `pointerdown`, because iOS fires no click on
+// a tap that lands on plain text, so the document would not hear it.
+function letGoOfDel(event) {
+  if (event.target.closest(".del.armed")) {
+    return;
+  }
+  disarm();
 }
 
 // The card's set buttons, two split pills: a main row and a warm-up row, each taken away by
@@ -422,7 +502,7 @@ function movement(exercise, xi, chip, part, count) {
   const menu = el("div", "part-menu");
   menu.append(button("⇆ Replace", "pill", () => openSearch("replace", xi, part)));
   menu.append(button("✕ Remove", "pill danger", () => {
-    // The last movement of a card goes the way Del takes the card.
+    // The last movement of a card goes the way the card's ✕ takes the card.
     if (count === 1) {
       apply(logic.removeExercise(state, xi));
       return;
@@ -898,6 +978,7 @@ async function restore(session) {
 }
 
 function wire() {
+  document.addEventListener("pointerdown", letGoOfDel);
   ui.sessionNote.addEventListener("change",
     () => applyQuiet(logic.setSessionNote(state, ui.sessionNote.value)));
   ui.addExercise.addEventListener("click", () => openSearch("add"));

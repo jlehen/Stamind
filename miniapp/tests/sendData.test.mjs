@@ -369,7 +369,7 @@ test("a Finish tapped by mistake can be resumed, and the next Finish sends again
     await page.waitForSelector(".card");
     // Telegram's bottom button is not covered by a sheet, so it hides while the search is up.
     assert.equal(await page.evaluate(() => window.__mainButton), true);
-    await page.locator(".card").first().getByText("⇆ Replace").click();
+    await page.locator(".card").first().locator(".replace").click();
     assert.equal(await page.evaluate(() => window.__mainButton), false);
     await page.locator("#search-close").click();
     assert.equal(await page.evaluate(() => window.__mainButton), true);
@@ -409,5 +409,116 @@ test("a page reopened on a newer revision of the day shows the log already sent"
     await page.reload();
     await page.waitForSelector(".card");
     assert.equal(await page.locator("#sent").isVisible(), true);
+  });
+});
+
+// A bench press, whose exercise has photos, and a split squat, whose exercise has none.
+const TWO_CARDS = {
+  ...logic.demoSession(),
+  d: "2026-11-16",
+  t: "Gym: upper and legs",
+  notes: "",
+  x: [{ n: "BENCH_PRESS/BENCH_PRESS", s: 3, lo: 6, hi: 8, kg: 65 },
+      { n: "LUNGE/DUMBBELL_BULGARIAN_SPLIT_SQUAT", s: 3, lo: 6, hi: 8, kg: 35 }],
+};
+
+async function openTwoCards(page, site) {
+  // The photos come from GitHub, which a test does not reach.
+  await page.route("**/raw.githubusercontent.com/**", (route) => route.abort());
+  await page.goto(`${site}/index.html#s=${logic.encodeSession(TWO_CARDS)}`,
+                  { waitUntil: "networkidle" });
+  await page.waitForSelector(".card");
+}
+
+// It is Tuesday. The athlete reaches for the bench press's ↓ and touches its ✕ (§1).
+test("a card's ✕ deletes on the second tap, and a tap elsewhere lets it go", async (t) => {
+  await onPhone(t, async (page, site) => {
+    await openTwoCards(page, site);
+    const names = () => page.locator(".card .chip").allTextContents();
+    const before = await names();
+    const del = page.locator(".card").first().locator(".del");
+    const other = page.locator(".card").nth(1).locator(".del");
+
+    // The first tap arms it and deletes nothing.
+    await del.click();
+    assert.match(await del.getAttribute("class"), /\barmed\b/);
+    assert.equal(await del.getAttribute("aria-label"), "Tap again to delete Bench press");
+    assert.deepEqual(await names(), before);
+
+    // A tap in a number box lets it go, and the box keeps its focus and what is typed: the
+    // cards were not drawn again.
+    const reps = page.locator(".card").nth(1).locator(".num").first();
+    await reps.click();
+    await reps.pressSequentially("9");
+    assert.doesNotMatch(await del.getAttribute("class"), /\barmed\b/);
+    assert.equal(await del.getAttribute("aria-label"), "Delete Bench press");
+    assert.equal(await reps.evaluate((field) => field === document.activeElement), true);
+    assert.equal(await reps.inputValue(), "9");
+
+    // One card is armed at a time.
+    await del.click();
+    await other.click();
+    assert.equal(await page.locator(".del.armed").count(), 1);
+    assert.match(await other.getAttribute("class"), /\barmed\b/);
+
+    // Two taps delete the card, and the header's Undo brings it back.
+    await del.click();
+    await del.click();
+    assert.deepEqual(await names(), before.slice(1));
+    await page.locator("#undo").click();
+    assert.deepEqual(await names(), before);
+  });
+});
+
+test("an armed ✕ lets go by itself after 3 seconds, without drawing the cards again",
+     async (t) => {
+  await onPhone(t, async (page, site) => {
+    await openTwoCards(page, site);
+    const del = page.locator(".card").first().locator(".del");
+    await del.click();
+    // The athlete types a load while the ✕ waits; focus moves with no tap on the page.
+    const kg = page.locator(".card").first().locator(".num").nth(1);
+    await kg.focus();
+    await kg.pressSequentially("70");
+    assert.match(await del.getAttribute("class"), /\barmed\b/);
+    await page.waitForTimeout(3200);
+    assert.doesNotMatch(await del.getAttribute("class"), /\barmed\b/);
+    assert.equal(await kg.evaluate((field) => field === document.activeElement), true);
+    assert.equal(await kg.inputValue(), "70");
+    assert.equal(await page.locator(".card").count(), 2);
+  });
+});
+
+test("the block beside a card's name: ⇆ replaces, 📷 shows the photos, if any", async (t) => {
+  await onPhone(t, async (page, site) => {
+    await openTwoCards(page, site);
+    const bench = page.locator(".card").first();
+    const lunge = page.locator(".card").nth(1);
+    const columns = (card) => card.locator(".moves")
+      .evaluate((block) => getComputedStyle(block).gridTemplateColumns);
+
+    await bench.locator(".replace").click();
+    assert.equal(await page.locator("#search-sheet").isVisible(), true);
+    assert.equal(await page.locator("#search-title").textContent(), "Replace Bench press");
+    await page.locator("#search-close").click();
+
+    // 📷 opens the photos and looks pressed, and a second tap closes them.
+    const pic = bench.locator(".pic");
+    assert.equal(await pic.getAttribute("aria-pressed"), "false");
+    assert.equal(await pic.getAttribute("aria-label"), "Show the photos of Bench press");
+    await pic.click();
+    assert.equal(await bench.locator(".photos img").count(), 2);
+    assert.equal(await pic.getAttribute("aria-pressed"), "true");
+    assert.equal(await pic.getAttribute("aria-label"), "Hide the photos of Bench press");
+    assert.notEqual(await pic.evaluate((node) => getComputedStyle(node).backgroundColor),
+                    "rgba(0, 0, 0, 0)");
+    await pic.click();
+    assert.equal(await bench.locator(".photos").count(), 0);
+    assert.equal(await pic.getAttribute("aria-pressed"), "false");
+
+    // A card whose exercise has no photos has no 📷 and two columns.
+    assert.equal(await columns(bench), "36px 36px 36px");
+    assert.equal(await lunge.locator(".pic").count(), 0);
+    assert.equal(await columns(lunge), "36px 36px");
   });
 });

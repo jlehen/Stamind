@@ -244,8 +244,8 @@ movement whose bare name is shared keeps its brackets, "[Row] Face pull" (D23).
 `perSideOf` reads the per-side rule of §3, so the reps boxes say "/side" as for any one-sided
 exercise. `photosOf` shows the first movement's photos. `patternOf` is already null for any key
 the catalog lacks, a chain's included, so the card's Replace on a chain card searches every
-exercise with no pattern filter and needs no change. The card's Replace and Del act on the
-whole card, as today.
+exercise with no pattern filter and needs no change. The card's ⇆ and ✕ act on the whole
+card, as today.
 
 **Building and changing a chain.** Nothing is added to the card's buttons and nothing to the
 footer (D21). A tap on a chip opens a rounded box around that movement holding three buttons,
@@ -260,7 +260,7 @@ exercise, Chain with is how a chain starts. Each edit works out the card's new k
 to `swapExercise`, recorded on the card as the card's Replace is: the sets stay, ticked or not,
 with their reps and kilograms; the written load leaves the card's line, as after a swap; and the
 card's ↶ takes the edit back. On a one-chip title, the chip's Replace does what the card's
-Replace does, under the same sheet title (D26), and Remove does what Del does, in Del's colour,
+Replace does, under the same sheet title (D26), and Remove does what ✕ does, in red, in one tap,
 and only the header's Undo brings a removed card back. The page checks nothing about the gear
 (D7): she is holding it, and a chain she has done passes the strength planner's check from then
 on (D10). Every edit gives the card a new key, so an edited chain is a new chain for the record
